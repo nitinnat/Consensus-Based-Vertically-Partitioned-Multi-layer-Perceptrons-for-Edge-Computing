@@ -17,18 +17,23 @@ import com.google.gson.JsonObject;
 
 public class HTTPSendDetailsAtOnce {
 	
-	public static void sendCommand(String command, int node_id)
+	public static void sendRequest(String base_url, String command, JsonObject nnconfig)
 	{
 	
 		HttpURLConnection connection = null;  
 
-	  //Then credentials and send string
-	    String send_string = command+"_"+node_id;
-	
-	    try {
+		//Then credentials and send string
+	    String send_string = base_url + "/" + command;
+	    
+	    ///First, all the GSON/JSon stuff up front
+        Gson gson = new Gson();
+        //convert java object to JSON format
+        String json = gson.toJson(nnconfig);
+	    
+        try {
 	      //Create connection
-	      URL url = new URL("http://127.0.0.1:5000/update_project/"+send_string);
-	      String urlParameters = "command=" + command+"+"+"node_id="+node_id;
+	      URL url = new URL("http://127.0.0.1:5000/"+send_string);
+	      String urlParameters = "nnconfig=" + URLEncoder.encode(json, "UTF-8");
 	      connection = (HttpURLConnection)url.openConnection();
 	      connection.setRequestMethod("POST");
 	      connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
@@ -49,6 +54,7 @@ public class HTTPSendDetailsAtOnce {
 	
 	      //Get Response    
 	      InputStream is = connection.getInputStream();
+	      
 	      BufferedReader rd = new BufferedReader(new InputStreamReader(is));
 	      String line;
 	      StringBuffer response = new StringBuffer(); 
@@ -57,6 +63,9 @@ public class HTTPSendDetailsAtOnce {
 	        response.append('\r');
 	      }
 	      rd.close();
+	      
+	      System.out.println(response);
+	      
 	    } catch (Exception e) {
 	        e.printStackTrace();
 	        //return null;
@@ -69,10 +78,6 @@ public class HTTPSendDetailsAtOnce {
 	
 	
 	public static void main(String args[]) {
-		HTTPSendDetailsAtOnce newConnection = new HTTPSendDetailsAtOnce();
-		newConnection.sendCommand("hello", 1);
-		newConnection.sendCommand("hello", 2);
-		newConnection.sendCommand("hello", 3);
 		
 	}
 

@@ -19,6 +19,11 @@
 package peersim;
 
 import java.io.*;
+import java.net.Socket;
+import java.net.URLEncoder;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 import peersim.cdsim.*;
 import peersim.config.*;
@@ -110,6 +115,66 @@ public static int getSimID() {
 }
 
 
+//Create global TCP socket here
+public static String host = "127.0.0.1";
+public static int port = 5000;
+
+
+public static Socket socket;
+public static BufferedWriter wr;
+public static BufferedReader rd;
+
+public static void openTCPSocket(String host, int port) {	
+	try {socket = new Socket(host, port);} 
+	catch (Exception e) {e.printStackTrace();}
+	finally {}
+}
+
+
+public static StringBuffer sendRequest(String command, JsonObject nnconfig) {
+	String path = "/vpnn/" + command;
+	StringBuffer response = new StringBuffer();
+    ///First, all the GSON/JSon stuff up front
+    Gson gson = new Gson();
+    //convert java object to JSON format
+    String json = gson.toJson(nnconfig);
+	try {
+	    String data = "nnconfig=" + URLEncoder.encode(json, "UTF-8");
+		BufferedWriter wr = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF8"));
+	    wr.write("POST " + path + " HTTP/1.0\r\n");
+	    wr.write("Content-Length: " + json.length() + "\r\n");
+	    wr.write("Content-Type: application/x-www-form-urlencoded\r\n");
+	    wr.write("\r\n");
+	
+	    wr.write(data);
+	    wr.flush();
+	
+	    BufferedReader rd = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+	    String line;
+	    
+	    while ((line = rd.readLine()) != null) {
+	    	response.append(line);
+	        response.append('\r');
+	    }
+//	    wr.close();
+//	    rd.close();
+	    
+	    // Return response string
+	    return response;
+	}
+	catch (Exception e) {
+        e.printStackTrace();
+	}
+	
+	return response;
+}
+
+
+public static void closeTCPSocket() {	
+}
+
+
+
 // ----------------------------------------------------------------------
 
 /**
@@ -151,6 +216,21 @@ public static int getSimID() {
 public static void main(String[] args)
 {
 	long time = System.currentTimeMillis();	
+	
+	
+	// Open Socket
+	System.out.println("Opening client TCP socket pointing to " + host + ":" + port);
+
+	
+	try {
+		socket = new Socket(host, port);
+		wr = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF8"));
+		rd = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+	}
+	catch (Exception e) {
+        e.printStackTrace();
+	}
+	
 	
 	System.err.println("Simulator: loading configuration");
 	Configuration.setConfig( new ParsedProperties(args) );

@@ -70,7 +70,12 @@ import org.nd4j.linalg.learning.config.Nadam;
 import org.nd4j.linalg.learning.config.Nesterovs;
 import org.nd4j.linalg.learning.config.Sgd;
 import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction;
+
+import com.google.gson.JsonObject;
+
 import org.nd4j.linalg.learning.config.Adam;
+
+import peersim.Simulator;
 import peersim.config.*;
 import peersim.core.*;
 
@@ -152,7 +157,6 @@ public class PegasosNode implements Node {
 	public INDArray train_features, test_features, train_labels, test_labels;
 	public int num_classes;
 	public int num_hidden_nodes;
-	public NeuralNetwork neural_network;
 	public String csv_filename;
 	public String csv_predictions_filename;
 	public String weights_filename;
@@ -176,6 +180,10 @@ public class PegasosNode implements Node {
 	public long random_seed;
 	public String result_dir;
 	
+	// NNConfig
+	public JsonObject nnconfig = null;
+	
+	
 	
 	// ================ constructor and initialization =================
 	// =================================================================
@@ -186,43 +194,9 @@ public class PegasosNode implements Node {
 	 * the configuration.
 	 */
 	
-	private static DataSet readCSVDataset(
-	        String csvFileClasspath, int batchSize, int labelIndex, int numClasses)
-	        throws IOException, InterruptedException {
+	
 
-	        RecordReader rr = new CSVRecordReader();
-	        rr.initialize(new FileSplit(new File(csvFileClasspath)));
-	        DataSetIterator iterator = new RecordReaderDataSetIterator(rr, batchSize, labelIndex, numClasses);
-	        return iterator.next();
-	    }
-
-	private static void processData(String dataset, int num_splits, int run){
-		if (num_splits > 1)
-		{
-			System.out.println(Files.exists(Paths.get("C:\\Users\\Nitin\\Anaconda3\\python.exe")));
-			// String command = "C:\\Users\\Nitin\\Anaconda3\\python.exe" +" scripts\\DataProcessor.py" + " -d " + dataset + " -n " + new Integer(num_splits).toString() + " -r " + new Integer(run).toString();
-			ProcessBuilder pb = new ProcessBuilder("C:\\Users\\Nitin\\Anaconda3\\python.exe",
-					"scripts/DataProcessor.py", 
-					"-d", dataset, 
-					"-n", new Integer(num_splits).toString(),
-					"-r", new Integer(run).toString()
-					);
-			pb.redirectOutput(Redirect.INHERIT);
-			pb.redirectError(Redirect.INHERIT);
-			try {
-				Process p = pb.start();
-				p.waitFor();
-				BufferedReader in = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-				System.out.println(in.read());
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}	
-	}
+	
 	
 	public PegasosNode(String prefix) {
 		System.out.println(prefix);
@@ -244,7 +218,7 @@ public class PegasosNode implements Node {
 		loss_func = (String)Configuration.getString(prefix + "." + PAR_LOSS_FUNCTION);
 		hidden_layer_activation = (String)Configuration.getString(prefix + "." + PAR_HIDDEN_ACT);
 		final_layer_activation = (String)Configuration.getString(prefix + "." + PAR_FINAL_ACT);
-
+		
 		System.out.println("model file and train file are saved in: " + resourcepath);
 		CommonState.setNode(this);
 		ID = nextID();
@@ -269,7 +243,11 @@ public class PegasosNode implements Node {
 	
 	public Object clone() {
 		
-		
+		/*
+		 * Initializes the node and makes an API call to the flask server to setup a neural network.
+		 * All NN configurations are managed through here - type of NN, number of layers, node_id, dataset_name,
+		 * learning rate, epochs, batch_size, activation, loss
+		 */
 		PegasosNode result = null;
 		
 		try { 
@@ -291,104 +269,37 @@ public class PegasosNode implements Node {
 		String base_dataset_name = temp_data[temp_data.length - 2];
         System.out.println("Base Dataset name" + base_dataset_name);
 		
-		// Get train file and test file paths
-        String localTrainFilepath = "";
-        String localTestFilepath = "";
         
+        // Create base NN on the Python side using these configurations
+        // Create a JSON object with configurations
+        JsonObject nnconfig = new JsonObject();
+        nnconfig.addProperty("dataset_name", base_dataset_name);
+        nnconfig.addProperty("node_id", result.getID());
+        nnconfig.addProperty("nn_type", "mlp");
+        nnconfig.addProperty("num_layers", 2);
+        nnconfig.addProperty("loss_function", loss_func);
+        nnconfig.addProperty("activation_function", activationmethod);
+        nnconfig.addProperty("learning_rate", learning_rate);      
+        nnconfig.addProperty("feature_split", 1);
         if (Network.size() == 1) {
-        	
-        	localTrainFilepath = resourcepath + "/" + base_dataset_name + "_train_binary.csv";
-        	localTestFilepath = resourcepath + "/" + base_dataset_name + "_test_binary.csv";
+        	nnconfig.addProperty("runtype", "centralized");
         }
-        
         else {
-        	localTrainFilepath = resourcepath + "/" + base_dataset_name + "_train_" + result.getID() + ".csv";
-        	localTestFilepath = resourcepath + "/" + base_dataset_name + "_test_" + result.getID() + ".csv";
+        	nnconfig.addProperty("runtype", "distributed");
         }
+        // Neighbor will be changed in GadgetProtocol
+        nnconfig.addProperty("neighbor", -1);
         
         
-		// Create a folder for this run if it does not exist
-        String new_dir_name = resourcepath + "/run_" + result.num_run + "_numhidden_" + num_hidden_nodes + "_lr_" + learning_rate + "_networksize_" + Network.size()+ "_randomseed_" + random_seed + "_lf_" + loss_func + "_haf_"+hidden_layer_activation + "_faf_" + final_layer_activation;
-        result.result_dir = new_dir_name;
-        System.out.println("Creating csv file to store the results.");
-    	result.csv_filename = new_dir_name + "/vpnn_results_temp_" + Network.size() + ".csv";
-    	result.csv_predictions_filename = new_dir_name + "/vpnn_results_temp_" + Network.size() + "_predictions" + ".csv";
-        File directory = new File(new_dir_name);
-	    if (! directory.exists()){
-	        directory.mkdir();
-	    
-	    }
-	    
-	    // If this is the first node in the cycle, then create the results file here.
-	    if (result.getID() == 0) {
-	    	 //Process data if network.size > 1
-	    	//if (Network.size() != 1) {
-	    	//	processData(base_dataset_name, Network.size(), num_run);
-	    	//}
-	    	// Create headers to store the results
-	    	
-	    	//result.weights_filename = resourcepath + "/run" + result.num_run + "/vpnn_weights_temp_" + Network.size() + ".csv";
-			System.out.println("Storing in " + result.csv_filename);
-			String opString = "Iter,Node,TrainLoss,TestLoss,TrainAccuracy,TestAccuracy,TrainAUC,TestAUC,Converged,NumConvergedCycles";
-			String opStringPredictions = "Iter,Node,TrainPredictions,TestPredictions,Layer1BeforeAct,Layer1AfterAct,Layer2BeforeAct,Layer2AfterAct,Layer1Wts,Layer2Wts";
-
-			try {
-				System.out.println("Writing header to " + result.csv_filename);
-				BufferedWriter bw = new BufferedWriter(new FileWriter(result.csv_filename));
-				bw.write(opString);
-				bw.write("\n");
-				bw.close();
-
-				System.out.println("Writing header to " + csv_predictions_filename);
-				BufferedWriter bw_predictions = new BufferedWriter(new FileWriter(result.csv_predictions_filename ));
-				bw_predictions.write(opStringPredictions);
-				bw_predictions.write("\n");
-				bw_predictions.close();
-			}
-			catch(Exception e) {}
-	    }
-		
-		
-		try{
-		    // Load training data    
-			System.out.println("Reading train data from: " + localTrainFilepath);
-		    result.train_set = readCSVDataset(
-		           localTrainFilepath,
-		            train_length, 0, 1
-		        );
-		    // Load test data
-		    System.out.println("Reading test data from: " + localTestFilepath);
-		    result.test_set = readCSVDataset(
-		    		localTestFilepath,
-		    		test_length, 0, 1
-			        );
-		    
-		    result.train_features = result.train_set.getFeatures();
-		    result.train_labels = result.train_set.getLabels();
-		    result.test_features = result.test_set.getFeatures();
-		    result.test_labels = result.test_set.getLabels();
-		    
-		    
-		    // Add bias to both train and test features
-		    result.train_features = NeuralNetwork.add_bias_to_input(result.train_features);
-		    result.test_features = NeuralNetwork.add_bias_to_input(result.test_features);
-		    
-		    System.out.println(result.train_features.shapeInfoToString());
-		    System.out.println(result.test_features.shapeInfoToString());
-	        int num_features = (int)result.train_features.size(1);
-	        int num_outputs = 1;
-	        
-	        // Create this Node's Neural Network instance
-	        NeuronLayer layer1 = new NeuronLayer(num_features, num_hidden_nodes, random_seed);
-	        NeuronLayer layer2 = new NeuronLayer(num_hidden_nodes, num_outputs, random_seed);
-	        
-	        // Combine the layers to create a neural network
-	        result.neural_network = new NeuralNetwork(layer1, layer2, learning_rate, loss_func, hidden_layer_activation, final_layer_activation);
-	        
-	        System.out.println("Initial weights \n");
-	        result.neural_network.print_weights();
-
-		} catch (Exception e) {e.printStackTrace();}
+        result.nnconfig = nnconfig;
+        
+        System.out.println(nnconfig.toString());
+        
+        
+        HTTPSendDetailsAtOnce.sendRequest("vpnn", "init", nnconfig);
+        
+        
+        
 		return result;
 		
 
