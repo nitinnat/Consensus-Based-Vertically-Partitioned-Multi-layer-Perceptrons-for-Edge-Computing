@@ -47,10 +47,14 @@ class NeuralNetwork:
         self.learning_rate = 0.2
         self.epochs = 0 # Number of epochs or cycles is controlled by peersim. Here we maintain a count
         self.runtype = nnconfig_dict['runtype']
-        self.loss_func = F.cross_entropy
+#        self.loss_func = F.cross_entropy
         self.loss_arr = []
         self.acc_arr = []
     
+    
+    def loss_function(self, y_hat, y):
+        return -(y_hat[range(y.shape[0]), y ].log()).mean()
+        
     def load_data(self):
         if self.runtype == "centralized":
             train_filename = "{}_{}.csv".format(self.dataset_name, "train_binary")
@@ -136,7 +140,7 @@ class NeuralNetwork:
     
     # Takes in the output vector from FF function
     def backpropagate(self, y_hat, clear_grad=True):
-        loss = self.loss_func(y_hat, self.y_train)
+        loss = self.loss_function(y_hat, self.y_train)
         loss.backward(retain_graph=True)
         
         # Update weights and biases
@@ -154,6 +158,7 @@ class NeuralNetwork:
                 self.bias1.grad.zero_()
                 self.weights2.grad.zero_()
                 self.bias2.grad.zero_()
+        return loss
     
     
     # Updates two nodes and returns updated neighbor node
@@ -169,12 +174,11 @@ class NeuralNetwork:
         y_mean = (y_hat_cur + y_hat_neighbor)/2
         
         # Backpropagate on both
-        self.backpropagate(y_mean, clear_grad=True)
-        neighbor_nn.backpropagate(y_mean, clear_grad=True)
-        print("Loss at node {} in iteration {} is: {}".format(self.node_id, self.epochs, self.loss))
+        loss = self.backpropagate(y_mean, clear_grad=True)
+#        neighbor_nn.backpropagate(y_mean, clear_grad=True)
+        print("Loss at node {} in iteration {} is: {}".format(self.node_id, self.epochs, loss))
         # Update current node's epochs parameter
         self.epochs += 1
-        return neighbor_nn
         
         
         

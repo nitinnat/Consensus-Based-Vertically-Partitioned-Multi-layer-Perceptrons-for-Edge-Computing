@@ -77,7 +77,6 @@ def updateWPProject(command):
                         
                         # Perform gossip with neighbor's dict as the parameter and update both neural networks
                         print("Node {} is gossipping with node {}.".format(node_id, neighbor_node_id))
-                        neural_network_dict[neighbor_node_id] = \
                         neural_network_dict[node_id].gossip(neural_network_dict[neighbor_node_id])
 
                     print("Number of neural networks currently existing: {}".format(len(neural_network_dict)))

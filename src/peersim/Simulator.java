@@ -218,20 +218,20 @@ public static void main(String[] args)
 	long time = System.currentTimeMillis();	
 	
 	
-	// Open Socket
-	System.out.println("Opening client TCP socket pointing to " + host + ":" + port);
-
-	
-	try {
-		socket = new Socket(host, port);
-		wr = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF8"));
-		rd = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-	}
-	catch (Exception e) {
-        e.printStackTrace();
-	}
-	
-	
+//	// Open Socket
+//	System.out.println("Opening client TCP socket pointing to " + host + ":" + port);
+//
+//	
+//	try {
+//		socket = new Socket(host, port);
+//		wr = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF8"));
+//		rd = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+//	}
+//	catch (Exception e) {
+//        e.printStackTrace();
+//	}
+//	
+//	
 	System.err.println("Simulator: loading configuration");
 	Configuration.setConfig( new ParsedProperties(args) );
 
