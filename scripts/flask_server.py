@@ -6,9 +6,9 @@ Created on Thu Apr 16 21:16:28 2020
 """
 
 from flask import Flask, jsonify
-from neuralnet import NeuralNetwork
 import sys
 import flask
+import pandas as pd
 import json
 import traceback
 import matplotlib.pyplot as plt
@@ -17,11 +17,13 @@ import io
 from flask import Response
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
+from neuralnet import NeuralNetworkCluster
+import os
 
 app = Flask(__name__)
 socketio = SocketIO(app)
 # This dictionary will store all the neural networks
-neural_network_dict = {}
+nn_cluster = NeuralNetworkCluster()
 
 @app.route('/')
 def hello_world():
@@ -42,44 +44,61 @@ def updateWPProject(command):
     print("Executing {} ".format(command))
     if flask.request.method == 'POST':
             nnconfig = flask.request.form['nnconfig']
+        
             
             if nnconfig:
                 try:
                     nnconfig_dict = json.loads(nnconfig)
+                    nnconfig_dict["model_type"] = "2-layer-nn"
                     node_id = nnconfig_dict["node_id"]        
                     
                     
                     if command == "init":
-                        neural_network_dict[node_id] = NeuralNetwork(nnconfig_dict)
-                        neural_network_dict[node_id].load_data()
+                        nn_cluster.appendNNToCluster(nnconfig_dict)
                     
                     if command == "train":
-                        if node_id in neural_network_dict.keys():
-                            neural_network_dict[node_id].train()
-                    
+                        nn_cluster.train(node_id)
+                        
+                    if command == "calc_losses":
+                        nn_cluster.compute_losses()
+                        
                     if command == "plot":
-                        if node_id in neural_network_dict.keys():
-                            plot_x, plot_y = list(range(neural_network_dict[node_id].epochs)), neural_network_dict[node_id].loss_arr 
-                            # Check https://stackoverflow.com/questions/50728328/python-how-to-show-matplotlib-in-flask
-                            fig, ax = plt.subplots()
-                            ax.plot(plot_x, plot_y)
-                            output = io.BytesIO()
-                            FigureCanvas(fig).print_png(output)
-                            return Response(output.getvalue(), mimetype='image/png')
+#                        if node_id in neural_network_dict.keys():
+#                            plot_x, plot_y = list(range(neural_network_dict[node_id].epochs)), neural_network_dict[node_id].loss_arr 
+#                            # Check https://stackoverflow.com/questions/50728328/python-how-to-show-matplotlib-in-flask
+#                            fig, ax = plt.subplots()
+#                            ax.plot(plot_x, plot_y)
+#                            output = io.BytesIO()
+#                            FigureCanvas(fig).print_png(output)
+#                            return Response(output.getvalue(), mimetype='image/png')
+                        
+                        loss_df = pd.DataFrame(columns=["Node", "Iter", "TrainLoss", "TestLoss"])
+                        for node_id in nn_cluster.neuralNetDict.keys():
+                            
+                            train_losses = nn_cluster.neuralNetDict[node_id]["train_losses"]
+                            test_losses = nn_cluster.neuralNetDict[node_id]["test_losses"]
+                            nodes = [node_id]*len(train_losses)
+                            iters = list(range(len(train_losses)))
+                            df = pd.DataFrame(data={"Node": nodes, "Iter": iters, "TrainLoss": train_losses, "TestLoss":test_losses})
+                            loss_df = loss_df.append(df)
+                            
+                        base_dir = "C:/Users/nitin/eclipse-workspace/consensus-deep-learning-version-2.0/data/"
+                        loss_df.to_csv(os.path.join(base_dir, 
+                                                    nnconfig_dict["dataset_name"], 
+                                                    "feature_split_" + str(nnconfig_dict["feature_split"]), 
+                                                    "{}_TrainLosses.csv".format(nnconfig_dict["runtype"])), index=False)
+                        print("Node: {}: {}".format(0, nn_cluster.neuralNetDict[0]["train_losses"]))
                         
                     if command == "gossip":
                         # Gossip only works for runtype == "distributed"
                         neighbor_node_id = nnconfig_dict["neighbor"]
                         assert nnconfig_dict["runtype"] == "distributed", "Cannot gossip in centralized setting"
-                        assert (node_id in neural_network_dict.keys() and neighbor_node_id in neural_network_dict.keys()), \
-                        "Either one of {} or {} is not present in created list of nodes".format(node_id, neighbor_node_id) 
-                        neighbor_node_id = nnconfig_dict["neighbor"]
-                        
+
                         # Perform gossip with neighbor's dict as the parameter and update both neural networks
                         print("Node {} is gossipping with node {}.".format(node_id, neighbor_node_id))
-                        neural_network_dict[node_id].gossip(neural_network_dict[neighbor_node_id])
+                        nn_cluster.gossip(node_id, neighbor_node_id)
 
-                    print("Number of neural networks currently existing: {}".format(len(neural_network_dict)))
+                    print("Number of neural networks currently existing: {}".format(len(nn_cluster.neuralNetDict.keys())))
                 except Exception as e:
                     track = traceback.format_exc()
                     print(track)

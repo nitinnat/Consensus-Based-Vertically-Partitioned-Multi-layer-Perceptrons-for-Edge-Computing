@@ -156,7 +156,7 @@ public class GadgetProtocol implements CDProtocol {
 	public void nextCycle(Node node, int pid) {
 		
 		PegasosNode pn = (PegasosNode)node; // Initializes the Pegasos Node
-		
+		int cycles = Configuration.getInt("simulation.cycles");
 		// Sending a 'train' command will run one round of feedforward and backpropation steps
 		// HTTP response object will contain convergence information
 		
@@ -172,6 +172,17 @@ public class GadgetProtocol implements CDProtocol {
 				// Don't do anything here
 				HTTPSendDetailsAtOnce.sendRequest("vpnn", "train", pn.nnconfig);
 			}
+			
+			// Compute loss
+			HTTPSendDetailsAtOnce.sendRequest("vpnn", "calc_losses", pn.nnconfig);
+			
+			
+			if (CDState.getCycle() == 2499) {
+				// plot loss curve
+				HTTPSendDetailsAtOnce.sendRequest("vpnn", "plot", pn.nnconfig);
+			}
+			
+			
 		}
 	
 		else {
@@ -187,18 +198,21 @@ public class GadgetProtocol implements CDProtocol {
 				// Send a command called gossip - which will use the current node ID, and neighbor ID
 				// and do feedforward on both -  share losses and then backpropagate on both
 				HTTPSendDetailsAtOnce.sendRequest("vpnn", "gossip", pn.nnconfig);
+				if (pn.getID() == Network.size()-1) {
+					HTTPSendDetailsAtOnce.sendRequest("vpnn", "calc_losses", pn.nnconfig);
+				}
 				
 			}
 			
 			
 			
 	}
-//		
-//		
-//		if (CDState.getCycle() == 99) {
-//			// plot loss curve
-//			HTTPSendDetailsAtOnce.sendRequest("vpnn", "plot", pn.nnconfig);
-//		}
+		
+		
+		if (CDState.getCycle() == 2499) {
+			// plot loss curve
+			HTTPSendDetailsAtOnce.sendRequest("vpnn", "plot", pn.nnconfig);
+		}
 
 	}
 
