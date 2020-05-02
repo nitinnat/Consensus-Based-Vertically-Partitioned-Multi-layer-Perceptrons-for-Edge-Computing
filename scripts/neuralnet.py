@@ -12,7 +12,7 @@ import math
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, mean_squared_error, log_loss
-
+import random
 
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.datasets import make_blobs
@@ -31,36 +31,62 @@ warnings.filterwarnings('ignore')
 
 
 
-
-
 class NeuralNetworkCluster:
     """
     Holds several neural networks in a dictionary.
     Each NN corresponds to a node in the distributed algorithm.
     """
-    def __init__(self):
+    def __init__(self, base_dir):
         from collections import defaultdict
         self.neuralNetDict = defaultdict(dict)
-        
+        self.base_dir = base_dir
         # This will store feature indices for each node - determined by overlap functionality
         self.featureDict = {1: []}
     
+    def init_data(self, dataset, num_nodes, feature_split_type):
+        train_filename = "{}_{}.csv".format(dataset, "train_binary")
+        test_filename = "{}_{}.csv".format(dataset, "test_binary")
+        
+        self.df_train = pd.read_csv(os.path.join(self.base_dir, dataset,train_filename))
+        self.df_test = pd.read_csv(os.path.join(self.base_dir, dataset,test_filename))
+        
+        if feature_split_type == "random" :
+            used_indices = []
+            num_features = len([col for col in self.df_train.columns if col not in ['label']])
+            num_features_split = int(np.ceil(num_features / float(num_nodes)))
+
+            idx_dict = {}
+            for split in range(num_nodes):
+                # if split == numsplits - 1:
+                #   num_features_split = num_features - len(used_indices) 
+
+                remaining_indices = [i for i in range(num_features) if i not in used_indices]
+                idx = random.sample(remaining_indices, num_features_split)
+                idx_dict[split] = idx
+                used_indices = used_indices + idx
+
+        self.feature_dict = idx_dict
+
     def appendNNToCluster(self, nn_config):
         node_id = nn_config["node_id"]
         if node_id in self.neuralNetDict.keys():
             logging.info("node_id: {} already exists in dictionary. Overwriting...".format(node_id))
         
         dataset = nn_config["dataset_name"]
-        base_dir = "C:/Users/nitin/eclipse-workspace/consensus-deep-learning-version-2.0/data/"
         feature_split = nn_config["feature_split"]
         
         if nn_config["model_type"] == "1-layer-nn":
             model = SingleLayerNeuralNetwork()
-            model.load_data(dataset, base_dir, feature_split, node_id)
+            df_train_node = self.df_train.iloc[:, self.feature_dict[node_id]]
+            df_test_node = self.df_test.iloc[:, self.feature_dict[node_id]]
+            model.set_data(df_train_node,  self.df_train['label'], df_test_node, self.df_test['label'])
             model.initialize(50)
+
         if nn_config["model_type"] == "2-layer-nn":
             model = TwoLayerNeuralNetwork()
-            model.load_data(dataset, base_dir, feature_split, node_id)
+            df_train_node = self.df_train.iloc[:, self.feature_dict[node_id]]
+            df_test_node = self.df_test.iloc[:, self.feature_dict[node_id]]
+            model.set_data(df_train_node,  self.df_train['label'], df_test_node, self.df_test['label'])
             model.initialize(50, 25)
         
         self.neuralNetDict[node_id]["model"] = model
@@ -138,10 +164,13 @@ class NeuralNetworkCluster:
             test_loss = criterion(y_pred_test.squeeze(), model.y_test)        
             self.neuralNetDict[node_id]["test_losses"].append(test_loss.item())
 
-    def load_data(self):
-        # dataset - load the entire dataset into memory
-        # 
-        
+    # def set_data(df_train_node, df_test_node):
+    #     # dataset - load the entire dataset into memory
+    #     # 
+    #     self.X_train = df_train_node[[col for col in df_train_node.columns if col != 'label']].float()
+    #     self.y_train = df_train_node['label'].long()
+    #     self.X_test = df_test_node[[col for col in df_test_node.columns if col != 'label']].float()
+    #     self.y_test = df_test_node['label'].long()
         
     def train(self, node_id):
         """
@@ -181,13 +210,13 @@ class SingleLayerNeuralNetwork(torch.nn.Module):
         self.sigmoid = torch.nn.Sigmoid()
     
     def load_data(self, dataset, base_dir, feature_split, node_id=None):
-        if node_id is None:
-            train_filename = "{}_{}.csv".format(dataset, "train_binary")
-            test_filename = "{}_{}.csv".format(dataset, "test_binary")
+        # if node_id is None:
+        #     train_filename = "{}_{}.csv".format(dataset, "train_binary")
+        #     test_filename = "{}_{}.csv".format(dataset, "test_binary")
         
-        else:
-            train_filename = "{}_{}_{}.csv".format(dataset, "train", node_id)
-            test_filename = "{}_{}_{}.csv".format(dataset, "test", node_id)
+        # else:
+        #     train_filename = "{}_{}_{}.csv".format(dataset, "train", node_id)
+        #     test_filename = "{}_{}_{}.csv".format(dataset, "test", node_id)
         
         df_train = pd.read_csv(os.path.join(base_dir, 
                                       dataset, 
@@ -221,15 +250,31 @@ class SingleLayerNeuralNetwork(torch.nn.Module):
         
         print(X_train.shape, X_test.shape, 
               y_train.shape, y_test.shape)
-        
-        
-    
+                    
     def forward(self, x):
         hidden = self.fc1(x)
         relu = self.relu(hidden)
         output = self.fc2(relu)
         output = output.exp()/output.exp().sum(-1).unsqueeze(-1)
         return output
+
+    def set_data(self, df_train_node, train_label, df_test_node, test_label):
+        # dataset - load the entire dataset into memory
+        # 
+        X_train = df_train_node[[col for col in df_train_node.columns if col != 'label']].values
+        y_train = train_label.values
+        X_test = df_test_node[[col for col in df_test_node.columns if col != 'label']].values
+        y_test = test_label.values
+        X_train, y_train, X_test, y_test = map(torch.tensor, (X_train, y_train, X_test, y_test))
+
+        self.X_train = X_train.float()
+        self.y_train = y_train.long()
+        self.X_test = X_test.float()
+        self.y_test = y_test.long()
+        
+        
+        print(X_train.shape, X_test.shape, 
+              y_train.shape, y_test.shape)
 
 
 class TwoLayerNeuralNetwork(torch.nn.Module):
@@ -302,6 +347,24 @@ class TwoLayerNeuralNetwork(torch.nn.Module):
         output = self.fc3(relu2)
         output = output.exp()/output.exp().sum(-1).unsqueeze(-1)
         return output
+
+    def set_data(self, df_train_node, train_label, df_test_node, test_label):
+        # dataset - load the entire dataset into memory
+        # 
+        X_train = df_train_node[[col for col in df_train_node.columns if col != 'label']].values
+        y_train = train_label.values
+        X_test = df_test_node[[col for col in df_test_node.columns if col != 'label']].values
+        y_test = test_label.values
+        X_train, y_train, X_test, y_test = map(torch.tensor, (X_train, y_train, X_test, y_test))
+
+        self.X_train = X_train.float()
+        self.y_train = y_train.long()
+        self.X_test = X_test.float()
+        self.y_test = y_test.long()
+        
+        
+        print(X_train.shape, X_test.shape, 
+              y_train.shape, y_test.shape)
 
 
 def test_cluster():

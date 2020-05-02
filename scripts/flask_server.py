@@ -22,8 +22,11 @@ import os
 
 app = Flask(__name__)
 socketio = SocketIO(app)
+
 # This dictionary will store all the neural networks
-nn_cluster = NeuralNetworkCluster()
+base_dir = "/Users/saurabh7/RA/consensus-deep-learning-version-2.0/data/"
+nn_cluster = NeuralNetworkCluster(base_dir)
+num_nodes = 10
 
 @app.route('/')
 def hello_world():
@@ -44,16 +47,17 @@ def updateWPProject(command):
     print("Executing {} ".format(command))
     if flask.request.method == 'POST':
             nnconfig = flask.request.form['nnconfig']
-        
             
             if nnconfig:
                 try:
                     nnconfig_dict = json.loads(nnconfig)
                     nnconfig_dict["model_type"] = "2-layer-nn"
-                    node_id = nnconfig_dict["node_id"]        
-                    
+                    node_id = nnconfig_dict["node_id"]
+                    nnconfig_dict["feature_split_type"] = "random"        
                     
                     if command == "init":
+                        if len(nn_cluster.neuralNetDict) == 0:
+                            nn_cluster.init_data(nnconfig_dict["dataset_name"], num_nodes, nnconfig_dict["feature_split_type"])
                         nn_cluster.appendNNToCluster(nnconfig_dict)
                     
                     if command == "train":
@@ -82,7 +86,6 @@ def updateWPProject(command):
                             df = pd.DataFrame(data={"Node": nodes, "Iter": iters, "TrainLoss": train_losses, "TestLoss":test_losses})
                             loss_df = loss_df.append(df)
                             
-                        base_dir = "C:/Users/nitin/eclipse-workspace/consensus-deep-learning-version-2.0/data/"
                         loss_df.to_csv(os.path.join(base_dir, 
                                                     nnconfig_dict["dataset_name"], 
                                                     "feature_split_" + str(nnconfig_dict["feature_split"]), 
