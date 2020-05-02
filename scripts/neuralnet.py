@@ -66,6 +66,7 @@ class NeuralNetworkCluster:
                 used_indices = used_indices + idx
 
         self.feature_dict = idx_dict
+        print(len(self.feature_dict))
 
     def appendNNToCluster(self, nn_config):
         node_id = nn_config["node_id"]
