@@ -286,6 +286,7 @@ public class PegasosNode implements Node {
         nnconfig.addProperty("feature_split", 1);
         nnconfig.addProperty("num_nodes", Network.size());
         nnconfig.addProperty("feature_split_type", feature_split_type);
+        nnconfig.addProperty("random_seed", random_seed);
 
         if (Network.size() == 1) {
         	nnconfig.addProperty("runtype", "centralized");

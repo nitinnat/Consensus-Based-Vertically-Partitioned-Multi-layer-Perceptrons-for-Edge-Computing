@@ -43,7 +43,8 @@ class NeuralNetworkCluster:
         # This will store feature indices for each node - determined by overlap functionality
         self.featureDict = {1: []}
     
-    def init_data(self, dataset, num_nodes, feature_split_type):
+    def init_data(self, dataset, num_nodes, feature_split_type, random_seed):
+        random.seed(random_seed)
         train_filename = "{}_{}.csv".format(dataset, "train_binary")
         test_filename = "{}_{}.csv".format(dataset, "test_binary")
         
