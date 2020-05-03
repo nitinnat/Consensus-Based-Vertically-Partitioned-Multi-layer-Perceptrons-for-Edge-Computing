@@ -115,6 +115,7 @@ public class PegasosNode implements Node {
 	private static final String PAR_HIDDEN_ACT = "hidden_layer_act";
 	private static final String PAR_FINAL_ACT = "final_layer_act";
 	private static final String PAR_FEATURE_SPLIT_TYPE = "feature_split_type";
+	private static final String PAR_OVERLAP_RATIO = "overlap_ratio";
 	
 	private static long counterID = -1; // used to generate unique IDs 
 	protected Protocol[] protocol = null; //The protocols on this node.
@@ -165,6 +166,7 @@ public class PegasosNode implements Node {
 	public String hidden_layer_activation;
 	public String final_layer_activation;
 	public String feature_split_type;
+	public double overlap_ratio;
 
 	// Variables to maintain loss
 	public double train_loss = -1;
@@ -221,6 +223,7 @@ public class PegasosNode implements Node {
 		hidden_layer_activation = (String)Configuration.getString(prefix + "." + PAR_HIDDEN_ACT);
 		final_layer_activation = (String)Configuration.getString(prefix + "." + PAR_FINAL_ACT);
 		feature_split_type = (String)Configuration.getString(PAR_FEATURE_SPLIT_TYPE);
+		overlap_ratio = Configuration.getDouble(PAR_OVERLAP_RATIO);
 		
 		System.out.println("model file and train file are saved in: " + resourcepath);
 		CommonState.setNode(this);
@@ -287,6 +290,7 @@ public class PegasosNode implements Node {
         nnconfig.addProperty("num_nodes", Network.size());
         nnconfig.addProperty("feature_split_type", feature_split_type);
         nnconfig.addProperty("random_seed", random_seed);
+        nnconfig.addProperty("overlap_ratio", overlap_ratio);
 
         if (Network.size() == 1) {
         	nnconfig.addProperty("runtype", "centralized");
