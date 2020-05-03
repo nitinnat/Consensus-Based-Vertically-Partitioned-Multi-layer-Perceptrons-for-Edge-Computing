@@ -43,7 +43,8 @@ class NeuralNetworkCluster:
         # This will store feature indices for each node - determined by overlap functionality
         self.featureDict = {1: []}
     
-    def init_data(self, dataset, num_nodes, feature_split_type):
+    def init_data(self, dataset, num_nodes, feature_split_type, random_seed, overlap_ratio=None):
+        random.seed(random_seed)
         train_filename = "{}_{}.csv".format(dataset, "train_binary")
         test_filename = "{}_{}.csv".format(dataset, "test_binary")
         
@@ -65,7 +66,28 @@ class NeuralNetworkCluster:
                 idx_dict[split] = idx
                 used_indices = used_indices + idx
 
+        elif feature_split_type == "overlap":
+            used_indices = []
+            num_features = len([col for col in self.df_train.columns if col not in ['label']])
+            num_features_split = int(np.ceil(num_features / float(num_nodes)))
+            num_features_overlap = int(np.ceil(overlap_ratio*num_features_split))
+            num_features_split = num_features_split - num_features_overlap
+
+            overlap_features = random.sample([i for i in range(num_features)], num_features_overlap)
+            used_indices += overlap_features
+            print('Number of features:', len(overlap_features), num_features_split)
+            idx_dict = {}
+            for split in range(num_nodes):
+                # if split == numsplits - 1:
+                #   num_features_split = num_features - len(used_indices) 
+
+                remaining_indices = [i for i in range(num_features) if i not in used_indices]
+                idx = random.sample(remaining_indices, num_features_split)
+                idx_dict[split] = idx + overlap_features
+                used_indices = used_indices + idx
+
         self.feature_dict = idx_dict
+        print(len(self.feature_dict))
 
     def appendNNToCluster(self, nn_config):
         node_id = nn_config["node_id"]
