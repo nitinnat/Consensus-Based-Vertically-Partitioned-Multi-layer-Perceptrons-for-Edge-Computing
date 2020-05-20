@@ -177,9 +177,11 @@ public class GadgetProtocol implements CDProtocol {
 			HTTPSendDetailsAtOnce.sendRequest("vpnn", "calc_losses", pn.nnconfig);
 			
 			
-			if (CDState.getCycle() == 2499) {
+			if (CDState.getCycle() == cycles-1) {
 				// plot loss curve
+				System.out.println("Cycles New " + cycles);
 				HTTPSendDetailsAtOnce.sendRequest("vpnn", "plot", pn.nnconfig);
+//				HTTPSendDetailsAtOnce.sendRequest("vpnn", "save_results", pn.nnconfig);
 			}
 			
 			
@@ -199,7 +201,10 @@ public class GadgetProtocol implements CDProtocol {
 				// and do feedforward on both -  share losses and then backpropagate on both
 				HTTPSendDetailsAtOnce.sendRequest("vpnn", "gossip", pn.nnconfig);
 				if (pn.getID() == Network.size()-1) {
+					
 					HTTPSendDetailsAtOnce.sendRequest("vpnn", "calc_losses", pn.nnconfig);
+					HTTPSendDetailsAtOnce.sendRequest("vpnn", "plot", pn.nnconfig);
+//					HTTPSendDetailsAtOnce.sendRequest("vpnn", "save_results", pn.nnconfig);
 				}
 				
 			}
@@ -209,8 +214,9 @@ public class GadgetProtocol implements CDProtocol {
 	}
 		
 		
-		if (CDState.getCycle() == 2499) {
+		if (CDState.getCycle() == cycles-1) {
 			// plot loss curve
+			System.out.println("Cycles " + cycles);
 			HTTPSendDetailsAtOnce.sendRequest("vpnn", "plot", pn.nnconfig);
 		}
 

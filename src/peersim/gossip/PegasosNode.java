@@ -26,58 +26,10 @@
 // todo: separate the writing into files from the training method
 
 package peersim.gossip;
-
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.LineNumberReader;
-import java.lang.ProcessBuilder.Redirect;
-import java.net.MalformedURLException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-
-import org.datavec.api.records.reader.RecordReader;
-import org.datavec.api.records.reader.impl.csv.CSVRecordReader;
-import org.datavec.api.split.FileSplit;
-import org.datavec.api.util.ClassPathResource;
-import org.deeplearning4j.datasets.datavec.RecordReaderDataSetIterator;
-import org.deeplearning4j.nn.conf.MultiLayerConfiguration;
-import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
-import org.deeplearning4j.nn.conf.layers.DenseLayer;
-import org.deeplearning4j.nn.conf.layers.OutputLayer;
-import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
-import org.deeplearning4j.nn.weights.WeightInit;
-import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
-import org.nd4j.linalg.activations.Activation;
-import org.nd4j.linalg.api.ndarray.INDArray;
-import org.nd4j.linalg.dataset.DataSet;
-import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
-import org.nd4j.linalg.factory.Nd4j;
-import org.nd4j.linalg.learning.config.Nadam;
-import org.nd4j.linalg.learning.config.Nesterovs;
-import org.nd4j.linalg.learning.config.Sgd;
-import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction;
-
 import com.google.gson.JsonObject;
-
-import org.nd4j.linalg.learning.config.Adam;
-
-import peersim.Simulator;
 import peersim.config.*;
 import peersim.core.*;
+
 
 /**
  * Class PegasosNode
@@ -97,29 +49,35 @@ public class PegasosNode implements Node {
 
 	
 	// Neural net params in the config file
-	private static final String PAR_LEARNING_RATE = "learningrate";
-	private static final String PAR_BATCH_SIZE = "batchsize";
-	private static final String PAR_INITIALIZATION = "initmethod";
-	private static final String PAR_ACTIVATION_METHOD = "activation";
-	private static final String PAR_EPOCHS = "epochs";
-	private static final String PAR_TRAINLEN = "trainlen";
-	private static final String PAR_TESTLEN = "testlen";
-	private static final String PAR_NUMCLASSES = "numclasses";
+	private static final String PAR_LEARNING_RATE = "learning_rate";
+	private static final String PAR_BATCH_SIZE = "batch_size";
+	private static final String PAR_INITIALIZATION = "init_method";
 	private static final String PAR_PATH = "resourcepath";	
-	private static final String PAR_SIZE = "size";
-	private static final String PAR_NUMHIDDEN = "numhidden";
-	private static final String PAR_CYCLES_FOR_CONVERGENCE = "cyclesforconvergence";
-	private static final String PAR_CONVERGENCE_EPSILON = "convergenceepsilon";
-	private static final String PAR_RANDOM_SEED = "randomseed";
-	private static final String PAR_LOSS_FUNCTION = "lossfunction";
+	private static final String PAR_NUMHIDDEN_1 = "numhidden_1";
+	private static final String PAR_NUMHIDDEN_2 = "numhidden_2";
+	private static final String PAR_NUMHIDDEN_3 = "numhidden_3";
+	private static final String PAR_CYCLES_FOR_CONVERGENCE = "cycles_for_convergence";
+	private static final String PAR_CONVERGENCE_EPSILON = "convergence_epsilon";
+	private static final String PAR_RANDOM_SEED = "random.seed";
+	private static final String PAR_LOSS_FUNCTION = "loss_function";
 	private static final String PAR_HIDDEN_ACT = "hidden_layer_act";
 	private static final String PAR_FINAL_ACT = "final_layer_act";
+	private static final String PAR_FEATURE_SPLIT_TYPE = "feature_split_type";
+	private static final String PAR_OVERLAP_RATIO = "overlap_ratio";
+	private static final String PAR_NN_TYPE = "nn_type";
+	private static final String PAR_NUM_LAYERS = "num_layers";
+	private static final String PAR_RUN = "run";
+	private static final String PAR_DATASET_NAME = "dataset_name";
+	private static final String PAR_NODE_ID = "node_id";
+	private static final String PAR_NUM_NODES = "num_nodes";
+	private static final String PAR_RUN_TYPE = "run_type";
+	private static final String PAR_NEIGHBOR = "neighbor";
+	
 	
 	private static long counterID = -1; // used to generate unique IDs 
 	protected Protocol[] protocol = null; //The protocols on this node.
 	
  	//learning parameters of the Neural Network 
-    private int train_length, test_length;
 	public double learning_rate;
 	public int epochs;
 	public int batch_size;
@@ -152,17 +110,24 @@ public class PegasosNode implements Node {
 	private int num_nodes;
 	public int num_run;
 	public long num_features;
-	public DataSet train_set;
-	public DataSet test_set;
-	public INDArray train_features, test_features, train_labels, test_labels;
 	public int num_classes;
-	public int num_hidden_nodes;
+	public int num_hidden_nodes_1;
+	public int num_hidden_nodes_2;
+	public int num_hidden_nodes_3;
 	public String csv_filename;
 	public String csv_predictions_filename;
 	public String weights_filename;
 	public String loss_func;
 	public String hidden_layer_activation;
 	public String final_layer_activation;
+	public String feature_split_type;
+	public double overlap_ratio;
+	public String nn_type;
+	public int num_layers;
+	String dataset_name;
+	int node_id;
+	String run_type;
+	
 	
 	// Variables to maintain loss
 	public double train_loss = -1;
@@ -199,27 +164,31 @@ public class PegasosNode implements Node {
 	
 	
 	public PegasosNode(String prefix) {
-		System.out.println(prefix);
-		String[] names = Configuration.getNames(PAR_PROT);
-		resourcepath = (String)Configuration.getString(prefix + "." + PAR_PATH);
-		learning_rate = Configuration.getDouble(prefix + "." + PAR_LEARNING_RATE, 1e-6);
-		batch_size = Configuration.getInt(prefix + "." + PAR_BATCH_SIZE, 4);
-		epochs = Configuration.getInt(prefix + "." + PAR_EPOCHS, 1);
-		initmethod = Configuration.getInt(prefix + "." + PAR_INITIALIZATION, 1);
-		activationmethod = Configuration.getInt(prefix + "." + PAR_ACTIVATION_METHOD, 0);
-		train_length = Configuration.getInt(prefix + "." + PAR_TRAINLEN, 0);
-		test_length = Configuration.getInt(prefix + "." + PAR_TESTLEN, 0);
-		num_classes = Configuration.getInt(prefix + "." + PAR_NUMCLASSES, 1);
-		num_hidden_nodes = Configuration.getInt(prefix + "." + PAR_NUMHIDDEN, 1);
-		learning_rate = Configuration.getDouble(prefix + "." + PAR_LEARNING_RATE, 0.01);
-		cycles_for_convergence = Configuration.getInt(prefix + "." + PAR_CYCLES_FOR_CONVERGENCE, 10);
-		convergence_epsilon = Configuration.getDouble(prefix + "." + PAR_CONVERGENCE_EPSILON, 0.01);
-		random_seed = Configuration.getLong(prefix + "." + PAR_RANDOM_SEED, 12345);
-		loss_func = (String)Configuration.getString(prefix + "." + PAR_LOSS_FUNCTION);
-		hidden_layer_activation = (String)Configuration.getString(prefix + "." + PAR_HIDDEN_ACT);
-		final_layer_activation = (String)Configuration.getString(prefix + "." + PAR_FINAL_ACT);
 		
-		System.out.println("model file and train file are saved in: " + resourcepath);
+		// Obtain configurations set in the config file
+		String[] names = Configuration.getNames(PAR_PROT);
+		learning_rate = Configuration.getDouble(PAR_LEARNING_RATE);
+		batch_size = Configuration.getInt(PAR_BATCH_SIZE, 4);
+		initmethod = Configuration.getInt(PAR_INITIALIZATION, 0);
+		resourcepath = (String)Configuration.getString(PAR_PATH);
+		num_hidden_nodes_1 = Configuration.getInt(PAR_NUMHIDDEN_1); // number of nodes in hidden layer 1
+		num_hidden_nodes_2 = Configuration.getInt(PAR_NUMHIDDEN_2); // number of nodes in hidden layer 2
+		num_hidden_nodes_3 = Configuration.getInt(PAR_NUMHIDDEN_3, 20); // number of nodes in hidden layer 3
+		cycles_for_convergence = Configuration.getInt(PAR_CYCLES_FOR_CONVERGENCE); 
+		convergence_epsilon = Configuration.getDouble(PAR_CONVERGENCE_EPSILON);
+		random_seed = Configuration.getLong(PAR_RANDOM_SEED); // will be used for determining feature splits
+		loss_func = (String)Configuration.getString(PAR_LOSS_FUNCTION); // Loss function 
+		hidden_layer_activation = (String)Configuration.getString(PAR_HIDDEN_ACT); // hidden layer activation
+		final_layer_activation = (String)Configuration.getString(PAR_FINAL_ACT); // final layer activation
+		feature_split_type = (String)Configuration.getString(PAR_FEATURE_SPLIT_TYPE); // overlap or non-overlap
+		overlap_ratio = Configuration.getDouble(PAR_OVERLAP_RATIO); // if feature_split_type is overlap then, this ratio is used
+		nn_type = Configuration.getString(PAR_NN_TYPE); // mlp, cnn, rnn, etc
+		num_layers = Configuration.getInt(PAR_NUM_LAYERS); // number of hidden layers
+		num_run = Configuration.getInt(PAR_RUN); // number of hidden layers
+		dataset_name = Configuration.getString(PAR_DATASET_NAME); // number of hidden layers
+		
+		
+		
 		CommonState.setNode(this);
 		ID = nextID();
 		protocol = new Protocol[names.length];
@@ -229,9 +198,6 @@ public class PegasosNode implements Node {
 					Configuration.getInstance(names[i]);
 			protocol[i] = p; 
 		}
-		num_nodes = Configuration.getInt(prefix + "." + PAR_SIZE, 20);
-		num_run = Configuration.getInt(prefix + "." + "run", 1);
-
 	}
 	
 	/**
@@ -265,44 +231,56 @@ public class PegasosNode implements Node {
 		System.out.println("creating node with ID: " + result.getID());
 		
 		// Determine base dataset name
-		String[] temp_data = resourcepath.split("/");
-		String base_dataset_name = temp_data[temp_data.length - 2];
+		//String[] temp_data = resourcepath.split("/");
+		String base_dataset_name = resourcepath; //temp_data[temp_data.length - 2];
         System.out.println("Base Dataset name" + base_dataset_name);
 		
         
         // Create base NN on the Python side using these configurations
         // Create a JSON object with configurations
         JsonObject nnconfig = new JsonObject();
-        nnconfig.addProperty("dataset_name", base_dataset_name);
-        nnconfig.addProperty("node_id", result.getID());
-        nnconfig.addProperty("nn_type", "mlp");
-        nnconfig.addProperty("num_layers", 2);
-        nnconfig.addProperty("loss_function", loss_func);
-        nnconfig.addProperty("activation_function", activationmethod);
-        nnconfig.addProperty("learning_rate", learning_rate);      
-        nnconfig.addProperty("feature_split", 1);
+        nnconfig.addProperty(PAR_LEARNING_RATE, learning_rate);
+        nnconfig.addProperty(PAR_BATCH_SIZE, batch_size);
+        nnconfig.addProperty(PAR_INITIALIZATION, initmethod);
+        nnconfig.addProperty(PAR_PATH, resourcepath);
+        nnconfig.addProperty(PAR_NUMHIDDEN_1, num_hidden_nodes_1);
+        nnconfig.addProperty(PAR_NUMHIDDEN_2, num_hidden_nodes_2);
+        nnconfig.addProperty(PAR_NUMHIDDEN_3, num_hidden_nodes_3);
+        nnconfig.addProperty(PAR_CYCLES_FOR_CONVERGENCE, cycles_for_convergence);
+        nnconfig.addProperty(PAR_CONVERGENCE_EPSILON, convergence_epsilon);
+        nnconfig.addProperty(PAR_RANDOM_SEED, random_seed);
+        nnconfig.addProperty(PAR_LOSS_FUNCTION, loss_func);
+        nnconfig.addProperty(PAR_HIDDEN_ACT, hidden_layer_activation);
+        nnconfig.addProperty(PAR_FINAL_ACT, final_layer_activation);
+        nnconfig.addProperty(PAR_FEATURE_SPLIT_TYPE, feature_split_type);
+        nnconfig.addProperty(PAR_OVERLAP_RATIO, overlap_ratio);
+        nnconfig.addProperty(PAR_NN_TYPE, nn_type);
+        nnconfig.addProperty(PAR_NUM_LAYERS, num_layers);
+        nnconfig.addProperty(PAR_DATASET_NAME, dataset_name);
+        nnconfig.addProperty(PAR_NODE_ID, result.getID());
+        nnconfig.addProperty(PAR_NUM_NODES, Network.size());
         if (Network.size() == 1) {
-        	nnconfig.addProperty("runtype", "centralized");
+        	nnconfig.addProperty(PAR_RUN_TYPE, "centralized");
         }
         else {
-        	nnconfig.addProperty("runtype", "distributed");
+        	nnconfig.addProperty(PAR_RUN_TYPE, "distributed");
         }
+        nnconfig.addProperty(PAR_RUN, num_run);
         // Neighbor will be changed in GadgetProtocol
-        nnconfig.addProperty("neighbor", -1);
-        
-        
+        nnconfig.addProperty(PAR_NEIGHBOR, -1);
         result.nnconfig = nnconfig;
         
+        System.out.println("JSON payload being sent:");
         System.out.println(nnconfig.toString());
         
-        
+        // Send 'clear' command to clear existing neural net cluster
+        if (node_id == 0) {
+        	HTTPSendDetailsAtOnce.sendRequest("vpnn", "clear", nnconfig);
+        }
+        // Send the 'init' http command to setup NNs
         HTTPSendDetailsAtOnce.sendRequest("vpnn", "init", nnconfig);
-        
-        
-        
 		return result;
 		
-
 	}
 
  

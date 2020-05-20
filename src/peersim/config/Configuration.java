@@ -313,9 +313,9 @@ private Configuration()
  */
 public static void setConfig(Properties p)
 {
-	if (config != null) {
-		throw new RuntimeException("Setting configuration was attempted twice.");
-	}
+//	if (config != null) {
+//		throw new RuntimeException("Setting configuration was attempted twice.");
+//	}
 	config = new ConfigContainer(p, false);
 }
 

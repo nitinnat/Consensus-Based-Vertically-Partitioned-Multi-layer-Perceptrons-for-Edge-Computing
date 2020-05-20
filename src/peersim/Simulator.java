@@ -21,6 +21,8 @@ package peersim;
 import java.io.*;
 import java.net.Socket;
 import java.net.URLEncoder;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -31,271 +33,262 @@ import peersim.core.*;
 import peersim.edsim.*;
 import peersim.gossip.PegasosNode;
 
-
 /**
-* This is the main entry point to peersim. This class loads configuration and
-* detects the simulation type. According to this, it invokes the appropriate
-* simulator. The known simulators at this moment, along with the way to
-* detect them are the following:
-* <ul>
-* <li>{@link CDSimulator}:
-* if {@link CDSimulator#isConfigurationCycleDriven} returns
-* true</li>
-* <li>{@link EDSimulator}:
-* if {@link EDSimulator#isConfigurationEventDriven} returns
-* true
-* </li>
-* </ul>
-* This list represents the order in which these alternatives are checked.
-* That is, if more than one return true, then the first will be taken.
-* Note that this class checks only for these clues and does not check if the
-* configuration is consistent or valid.
-* @see #main
-*/
+ * This is the main entry point to peersim. This class loads configuration and
+ * detects the simulation type. According to this, it invokes the appropriate
+ * simulator. The known simulators at this moment, along with the way to detect
+ * them are the following:
+ * <ul>
+ * <li>{@link CDSimulator}: if {@link CDSimulator#isConfigurationCycleDriven}
+ * returns true</li>
+ * <li>{@link EDSimulator}: if {@link EDSimulator#isConfigurationEventDriven}
+ * returns true</li>
+ * </ul>
+ * This list represents the order in which these alternatives are checked. That
+ * is, if more than one return true, then the first will be taken. Note that
+ * this class checks only for these clues and does not check if the
+ * configuration is consistent or valid.
+ * 
+ * @see #main
+ */
 public class Simulator {
 
 // ========================== static constants ==========================
 // ======================================================================
 
-/** {@link CDSimulator} */
-public static final int CDSIM = 0;
+	/** {@link CDSimulator} */
+	public static final int CDSIM = 0;
 
-/** {@link EDSimulator} */
-public static final int EDSIM = 1;
+	/** {@link EDSimulator} */
+	public static final int EDSIM = 1;
 
-/** Unknown simulator */
-public static final int UNKNOWN = -1;
+	/** Unknown simulator */
+	public static final int UNKNOWN = -1;
 
-/** the class names of simulators used */
-protected static final String[] simName = {
-	"peersim.cdsim.CDSimulator",
-	"peersim.edsim.EDSimulator",
-};
+	/** the class names of simulators used */
+	protected static final String[] simName = { "peersim.cdsim.CDSimulator", "peersim.edsim.EDSimulator", };
 
-/**
- * Parameter representing the number of times the experiment is run.
- * Defaults to 1.
- * @config
- */
-public static final String PAR_EXPS = "simulation.experiments";
-	
-/**
- * If present, this parameter activates the redirection of the standard
- * output to a given PrintStream.
- * This comes useful for processing the output of the simulation from
- * within the simulator.
- * @config
- */
-public static final String PAR_REDIRECT = "simulation.stdout";
+	/**
+	 * Parameter representing the number of times the experiment is run. Defaults to
+	 * 1.
+	 * 
+	 * @config
+	 */
+	public static final String PAR_EXPS = "simulation.experiments";
+
+	/**
+	 * If present, this parameter activates the redirection of the standard output
+	 * to a given PrintStream. This comes useful for processing the output of the
+	 * simulation from within the simulator.
+	 * 
+	 * @config
+	 */
+	public static final String PAR_REDIRECT = "simulation.stdout";
 
 // ==================== static fields ===================================
 // ======================================================================
 
-/** */
-private static int simID = UNKNOWN;
+	/** */
+	private static int simID = UNKNOWN;
 
 //========================== methods ===================================
 //======================================================================
 
-/**
-* Returns the numeric id of the simulator to invoke. At the moment this can
-* be {@link #CDSIM}, {@link #EDSIM} or {@link #UNKNOWN}.
-*/
-public static int getSimID() {
-	
-	if (simID == UNKNOWN) {
-		if( CDSimulator.isConfigurationCycleDriven()){
-			simID = CDSIM;
-		}
-		else if( EDSimulator.isConfigurationEventDriven() ) {	
-			simID = EDSIM;
-		}
-	}
-	return simID;
-}
+	/**
+	 * Returns the numeric id of the simulator to invoke. At the moment this can be
+	 * {@link #CDSIM}, {@link #EDSIM} or {@link #UNKNOWN}.
+	 */
+	public static int getSimID() {
 
+		if (simID == UNKNOWN) {
+			if (CDSimulator.isConfigurationCycleDriven()) {
+				simID = CDSIM;
+			} else if (EDSimulator.isConfigurationEventDriven()) {
+				simID = EDSIM;
+			}
+		}
+		return simID;
+	}
 
 //Create global TCP socket here
-public static String host = "127.0.0.1";
-public static int port = 5000;
+	public static String host = "127.0.0.1";
+	public static int port = 5000;
 
+	public static Socket socket;
+	public static BufferedWriter wr;
+	public static BufferedReader rd;
 
-public static Socket socket;
-public static BufferedWriter wr;
-public static BufferedReader rd;
+	public static void openTCPSocket(String host, int port) {
+		try {
+			socket = new Socket(host, port);
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+		}
+	}
 
-public static void openTCPSocket(String host, int port) {	
-	try {socket = new Socket(host, port);} 
-	catch (Exception e) {e.printStackTrace();}
-	finally {}
-}
+	public static void showFiles(File[] files) {
+		for (File file : files) {
+			if (file.isDirectory()) {
+				System.out.println("Directory: " + file.getName());
+				showFiles(file.listFiles()); // Calls same method again.
+			} else {
+				System.out.println("File: " + file.getName());
+			}
+		}
+	}
 
+	public static StringBuffer sendRequest(String command, JsonObject nnconfig) {
+		String path = "/vpnn/" + command;
+		StringBuffer response = new StringBuffer();
+		/// First, all the GSON/JSon stuff up front
+		Gson gson = new Gson();
+		// convert java object to JSON format
+		String json = gson.toJson(nnconfig);
+		try {
+			String data = "nnconfig=" + URLEncoder.encode(json, "UTF-8");
+			BufferedWriter wr = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF8"));
+			wr.write("POST " + path + " HTTP/1.0\r\n");
+			wr.write("Content-Length: " + json.length() + "\r\n");
+			wr.write("Content-Type: application/x-www-form-urlencoded\r\n");
+			wr.write("\r\n");
 
-public static StringBuffer sendRequest(String command, JsonObject nnconfig) {
-	String path = "/vpnn/" + command;
-	StringBuffer response = new StringBuffer();
-    ///First, all the GSON/JSon stuff up front
-    Gson gson = new Gson();
-    //convert java object to JSON format
-    String json = gson.toJson(nnconfig);
-	try {
-	    String data = "nnconfig=" + URLEncoder.encode(json, "UTF-8");
-		BufferedWriter wr = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF8"));
-	    wr.write("POST " + path + " HTTP/1.0\r\n");
-	    wr.write("Content-Length: " + json.length() + "\r\n");
-	    wr.write("Content-Type: application/x-www-form-urlencoded\r\n");
-	    wr.write("\r\n");
-	
-	    wr.write(data);
-	    wr.flush();
-	
-	    BufferedReader rd = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-	    String line;
-	    
-	    while ((line = rd.readLine()) != null) {
-	    	response.append(line);
-	        response.append('\r');
-	    }
+			wr.write(data);
+			wr.flush();
+
+			BufferedReader rd = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+			String line;
+
+			while ((line = rd.readLine()) != null) {
+				response.append(line);
+				response.append('\r');
+			}
 //	    wr.close();
 //	    rd.close();
-	    
-	    // Return response string
-	    return response;
+
+			// Return response string
+			return response;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return response;
 	}
-	catch (Exception e) {
-        e.printStackTrace();
+
+	public static void closeTCPSocket() {
 	}
-	
-	return response;
-}
-
-
-public static void closeTCPSocket() {	
-}
-
-
 
 // ----------------------------------------------------------------------
 
-/**
-* Loads the configuration and executes the experiments.
-* The number of independent experiments is given by config parameter
-* {@value #PAR_EXPS}. In all experiments the configuration is the same,
-* only the random seed is not re-initialized between experiments.
-* <p>
-* Loading the configuration is currently done with the help of constructing
-* an instance of {@link ParsedProperties} using the constructor
-* {@link ParsedProperties#ParsedProperties(String[])}.
-* The parameter
-* <code>args</code> is simply passed to this class. This class is then used
-* to initialize the configuration.
-* <p>
-* After loading the configuration, the experiments are run by invoking the
-* appropriate engine, which is identified as follows:
-* <ul>
-* <li>{@link CDSimulator}:
-* if {@link CDSimulator#isConfigurationCycleDriven} returns
-* true</li>
-* <li>{@link EDSimulator}:
-* if {@link EDSimulator#isConfigurationEventDriven} returns
-* true
-* </li>
-* </ul>
-* <p>
-* This list represents the order in which these alternatives are checked.
-* That is, if more than one return true, then the first will be taken.
-* Note that this class checks only for these clues and does not check if the
-* configuration is consistent or valid.
-* @param args passed on to
-* {@link ParsedProperties#ParsedProperties(String[])}
-* @see ParsedProperties
-* @see Configuration
-* @see CDSimulator
-* @see EDSimulator
-*/
-public static void main(String[] args)
-{
-	long time = System.currentTimeMillis();	
-	
-	
-//	// Open Socket
-//	System.out.println("Opening client TCP socket pointing to " + host + ":" + port);
-//
-//	
-//	try {
-//		socket = new Socket(host, port);
-//		wr = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF8"));
-//		rd = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-//	}
-//	catch (Exception e) {
-//        e.printStackTrace();
-//	}
-//	
-//	
-	System.err.println("Simulator: loading configuration");
-	Configuration.setConfig( new ParsedProperties(args) );
+	/**
+	 * Loads the configuration and executes the experiments. The number of
+	 * independent experiments is given by config parameter {@value #PAR_EXPS}. In
+	 * all experiments the configuration is the same, only the random seed is not
+	 * re-initialized between experiments.
+	 * <p>
+	 * Loading the configuration is currently done with the help of constructing an
+	 * instance of {@link ParsedProperties} using the constructor
+	 * {@link ParsedProperties#ParsedProperties(String[])}. The parameter
+	 * <code>args</code> is simply passed to this class. This class is then used to
+	 * initialize the configuration.
+	 * <p>
+	 * After loading the configuration, the experiments are run by invoking the
+	 * appropriate engine, which is identified as follows:
+	 * <ul>
+	 * <li>{@link CDSimulator}: if {@link CDSimulator#isConfigurationCycleDriven}
+	 * returns true</li>
+	 * <li>{@link EDSimulator}: if {@link EDSimulator#isConfigurationEventDriven}
+	 * returns true</li>
+	 * </ul>
+	 * <p>
+	 * This list represents the order in which these alternatives are checked. That
+	 * is, if more than one return true, then the first will be taken. Note that
+	 * this class checks only for these clues and does not check if the
+	 * configuration is consistent or valid.
+	 * 
+	 * @param args passed on to {@link ParsedProperties#ParsedProperties(String[])}
+	 * @see ParsedProperties
+	 * @see Configuration
+	 * @see CDSimulator
+	 * @see EDSimulator
+	 */
+	public static void main(String[] args) {
+		long time = System.currentTimeMillis();
+		System.out.println(args[0]);
+		System.err.println("Simulator: loading configuration folder");
 
-	PrintStream newout =
-		(PrintStream)Configuration.getInstance(PAR_REDIRECT,System.out);
-	if(newout!=System.out) System.setOut(newout);
-	
-	int exps = Configuration.getInt(PAR_EXPS,1);
+		File[] files = new File(args[0]).listFiles();
+		showFiles(files);
+		Path basePath = Paths.get(args[0]);
 
-	final int SIMID = getSimID();
-	if( SIMID == UNKNOWN )
-	{
+		System.out.println(basePath.toString());
+		for (File file : files) {
+			if (!file.isDirectory()) {
+				System.out.println("Running with config file: " + file.getName());
+				Path filePath = Paths.get(basePath.toString(), file.getName());
 
-		System.err.println(
-		    "Simulator: unable to determine simulation engine type");
-		return;
-	}
-	
-	try {
-		
-		for(int k=0; k<exps; ++k)
-		{
-			if( k>0 )
-			{
-				long seed = CommonState.r.nextLong();
-				CommonState.initializeRandom(seed);
-			}
-			System.err.print("Simulator: starting experiment "+k);
-			System.err.println(" invoking "+simName[SIMID]);
-			System.err.println("Random seed: "+
-				CommonState.r.getLastSeed());
-			System.out.println("\n\n");
-			
-			//--------------------------------------------------
-			
-			// XXX could be done through reflection, but
-			// this is easier to read.
-			switch(SIMID)
-			{
-			case CDSIM:
-				CDSimulator.nextExperiment();
-				break;
-			case EDSIM:
-				EDSimulator.nextExperiment();
-				break;
+				try {
+					Configuration.setConfig(new ParsedProperties(filePath.toString()));
+				} catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+
+				PrintStream newout = (PrintStream) Configuration.getInstance(PAR_REDIRECT, System.out);
+				if (newout != System.out)
+					System.setOut(newout);
+
+				int exps = Configuration.getInt(PAR_EXPS, 1);
+
+				final int SIMID = getSimID();
+				if (SIMID == UNKNOWN) {
+
+					System.err.println("Simulator: unable to determine simulation engine type");
+					return;
+				}
+
+				try {
+
+					for (int k = 0; k < exps; ++k) {
+						if (k > 0) {
+							long seed = CommonState.r.nextLong();
+							CommonState.initializeRandom(seed);
+						}
+						System.err.print("Simulator: starting experiment " + k);
+						System.err.println(" invoking " + simName[SIMID]);
+						System.err.println("Random seed: " + CommonState.r.getLastSeed());
+						System.out.println("\n\n");
+
+						// --------------------------------------------------
+
+						// XXX could be done through reflection, but
+						// this is easier to read.
+						switch (SIMID) {
+						case CDSIM:
+							CDSimulator.nextExperiment();
+							break;
+						case EDSIM:
+							EDSimulator.nextExperiment();
+							break;
+						}
+					}
+
+				} catch (MissingParameterException e) {
+					System.err.println(e + "");
+					System.exit(1);
+				} catch (IllegalParameterException e) {
+					System.err.println(e + "");
+					System.exit(1);
+				}
+
+				// undocumented testing capabilities
+				if (Configuration.contains("__t"))
+					System.out.println(System.currentTimeMillis() - time);
+				if (Configuration.contains("__x"))
+					Network.test();
 			}
 		}
-	
-	} catch (MissingParameterException e) {
-		System.err.println(e+"");
-		System.exit(1);
-	} catch (IllegalParameterException e) {
-		System.err.println(e+"");
-		System.exit(1);
-	}
-	
 
-	// undocumented testing capabilities
-	if(Configuration.contains("__t")) 
-		System.out.println(System.currentTimeMillis()-time);
-	if(Configuration.contains("__x")) Network.test();
-	
-	
-	
-}
+	}
 
 }

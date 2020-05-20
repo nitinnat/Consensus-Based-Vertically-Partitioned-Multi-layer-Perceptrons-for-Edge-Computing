@@ -12,7 +12,7 @@ import math
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, mean_squared_error, log_loss
-
+import random
 
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.datasets import make_blobs
@@ -29,8 +29,9 @@ warnings.filterwarnings('ignore')
 # Todo: data loading should be done in another class
 # Todo: Make each model into a class and pass this into higher NNTrainer class
 
-
-
+def softmax(t):
+    return t.exp()/t.exp().sum(-1).unsqueeze(-1)
+    
 
 
 class NeuralNetworkCluster:
@@ -38,35 +39,87 @@ class NeuralNetworkCluster:
     Holds several neural networks in a dictionary.
     Each NN corresponds to a node in the distributed algorithm.
     """
-    def __init__(self):
+    def __init__(self, base_dir):
         from collections import defaultdict
         self.neuralNetDict = defaultdict(dict)
-        
+        self.base_dir = base_dir
         # This will store feature indices for each node - determined by overlap functionality
         self.featureDict = {1: []}
+        self.epoch = 0
     
+    def init_data(self, dataset, num_nodes, feature_split_type, random_seed, overlap_ratio=None):
+        random.seed(random_seed)
+        train_filename = "{}_{}.csv".format(dataset, "train_binary")
+        test_filename = "{}_{}.csv".format(dataset, "test_binary")
+        
+        self.df_train = pd.read_csv(os.path.join(self.base_dir, dataset,train_filename))
+        self.df_test = pd.read_csv(os.path.join(self.base_dir, dataset,test_filename))
+        
+        if feature_split_type == "random" :
+            used_indices = []
+            num_features = len([col for col in self.df_train.columns if col not in ['label']])
+            num_features_split = int(np.ceil(num_features / float(num_nodes)))
+
+            idx_dict = {}
+            for split in range(num_nodes):
+                # if split == numsplits - 1:
+                #   num_features_split = num_features - len(used_indices) 
+
+                remaining_indices = [i for i in range(num_features) if i not in used_indices]
+                idx = random.sample(remaining_indices, num_features_split)
+                idx_dict[split] = idx
+                used_indices = used_indices + idx
+
+        elif feature_split_type == "overlap":
+            used_indices = []
+            num_features = len([col for col in self.df_train.columns if col not in ['label']])
+            num_features_split = int(np.ceil(num_features / float(num_nodes)))
+            num_features_overlap = int(np.ceil(overlap_ratio*num_features_split))
+            num_features_split = num_features_split - num_features_overlap
+
+            overlap_features = random.sample([i for i in range(num_features)], num_features_overlap)
+            used_indices += overlap_features
+            print('Number of features:', len(overlap_features), num_features_split)
+            idx_dict = {}
+            for split in range(num_nodes):
+                # if split == numsplits - 1:
+                #   num_features_split = num_features - len(used_indices) 
+
+                remaining_indices = [i for i in range(num_features) if i not in used_indices]
+                idx = random.sample(remaining_indices, num_features_split)
+                idx_dict[split] = idx + overlap_features
+                used_indices = used_indices + idx
+
+        self.feature_dict = idx_dict
+        print(len(self.feature_dict))
+
     def appendNNToCluster(self, nn_config):
         node_id = nn_config["node_id"]
         if node_id in self.neuralNetDict.keys():
             logging.info("node_id: {} already exists in dictionary. Overwriting...".format(node_id))
         
-        dataset = nn_config["dataset_name"]
-        base_dir = "C:/Users/nitin/eclipse-workspace/consensus-deep-learning-version-2.0/data/"
-        feature_split = nn_config["feature_split"]
-        
-        if nn_config["model_type"] == "1-layer-nn":
+        dataset = nn_config["dataset_name"]        
+        if nn_config["num_layers"] == 1:
             model = SingleLayerNeuralNetwork()
-            model.load_data(dataset, base_dir, feature_split, node_id)
-            model.initialize(50)
-        if nn_config["model_type"] == "2-layer-nn":
+            df_train_node = self.df_train.iloc[:, self.feature_dict[node_id]]
+            df_test_node = self.df_test.iloc[:, self.feature_dict[node_id]]
+            model.set_data(df_train_node,  self.df_train['label'], df_test_node, self.df_test['label'])
+            model.initialize(nn_config)
+
+        if nn_config["num_layers"] == 2:
             model = TwoLayerNeuralNetwork()
-            model.load_data(dataset, base_dir, feature_split, node_id)
-            model.initialize(50, 25)
+            df_train_node = self.df_train.iloc[:, self.feature_dict[node_id]]
+            df_test_node = self.df_test.iloc[:, self.feature_dict[node_id]]
+            model.set_data(df_train_node,  self.df_train['label'], df_test_node, self.df_test['label'])
+            model.initialize(nn_config)
         
         self.neuralNetDict[node_id]["model"] = model
         
         # Loss criterion
-        criterion = torch.nn.CrossEntropyLoss()
+        if nn_config["loss_function"] == "cross_entropy":
+            criterion = torch.nn.CrossEntropyLoss()
+        else:
+            raise ValueError("{} is not a supported loss function".format(nn_config["loss_function"]))
         self.neuralNetDict[node_id]["criterion"] = criterion
         
         # Optimizer
@@ -75,7 +128,8 @@ class NeuralNetworkCluster:
         
         self.neuralNetDict[node_id]["train_losses"] = []
         self.neuralNetDict[node_id]["test_losses"] = []
-        
+        self.neuralNetDict[node_id]["train_preds"] = []
+        self.neuralNetDict[node_id]["test_preds"] = []
         
     def gossip(self, node_id, neighbor_node_id):
         """
@@ -117,31 +171,56 @@ class NeuralNetworkCluster:
         print("Train Loss @ Node {}: {}, Train Loss @ Node {}: {}".format(node_id, 
               loss0.item(), neighbor_node_id, loss1.item()))
         
+    def save_results(self):
+        """
+        Stores a pickle file of the NeuralNetworkCluster object
+        """
+        
+        import pickle
+        pickle.dump()
     
-    
-    def compute_losses(self):
+    def compute_losses_and_accuracies(self):
         """
         Computes train and test losses for all the nodes.
         """
+        y_pred_train_agg = None
+        y_pred_test_agg = None
+        
         for node_id in self.neuralNetDict.keys():
+            
             
             model = self.neuralNetDict[node_id]["model"]
             criterion = self.neuralNetDict[node_id]["criterion"]        
             
             # Compute Train Loss
             y_pred_train = model(model.X_train)
-            train_loss = criterion(y_pred_train.squeeze(), model.y_test) 
+            y_pred_train = y_pred_train.squeeze()
+            print(y_pred_train)
+            import sys
+            sys.exit()
+            
+            train_loss = criterion(y_pred_train, model.y_test) 
             self.neuralNetDict[node_id]["train_losses"].append(train_loss.item())
             
             # Compute Test Loss
             y_pred_test = model(model.X_test)
-            test_loss = criterion(y_pred_test.squeeze(), model.y_test)        
+            y_pred_test = y_pred_test.squeeze()
+            test_loss = criterion(y_pred_test, model.y_test)        
             self.neuralNetDict[node_id]["test_losses"].append(test_loss.item())
-
-    def load_data(self):
-        # dataset - load the entire dataset into memory
-        # 
-        
+            
+            if node_id == 0:
+                y_pred_train_agg = y_pred_train
+                y_pred_test_agg = y_pred_test
+            else:
+                y_pred_train_agg += y_pred_train
+                y_pred_test_agg += y_pred_test
+    # def set_data(df_train_node, df_test_node):
+    #     # dataset - load the entire dataset into memory
+    #     # 
+    #     self.X_train = df_train_node[[col for col in df_train_node.columns if col != 'label']].float()
+    #     self.y_train = df_train_node['label'].long()
+    #     self.X_test = df_test_node[[col for col in df_test_node.columns if col != 'label']].float()
+    #     self.y_test = df_test_node['label'].long()
         
     def train(self, node_id):
         """
@@ -170,15 +249,25 @@ class SingleLayerNeuralNetwork(torch.nn.Module):
         self.y_train = None
         self.X_test = None
         self.y_test = None
+        self.nn_config_dict = {}
     
-    def initialize(self, hidden_size):
+    def initialize(self, nn_config_dict):
+        self.nn_config_dict = nn_config_dict
         super(SingleLayerNeuralNetwork, self).__init__()
         self.input_size = self.X_train.shape[1]
-        self.hidden_size  = hidden_size
+        self.hidden_size  = nn_config_dict["numhidden_1"]
         self.fc1 = torch.nn.Linear(self.input_size, self.hidden_size)
+        
+        # Define the activation functions to be used
+        self.tanh = torch.nn.Tanh()
         self.relu = torch.nn.ReLU()
-        self.fc2 = torch.nn.Linear(self.hidden_size, 2)
         self.sigmoid = torch.nn.Sigmoid()
+        self.softmax = softmax
+        
+        self.fc2 = torch.nn.Linear(self.hidden_size, 2)
+        # Define hidden layer and final layer activastion functions
+        self.hidden_act_func = self.get_hidden_act_function()
+        self.final_act_func = self.get_final_act_function()
     
     def load_data(self, dataset, base_dir, feature_split, node_id=None):
         if node_id is None:
@@ -221,15 +310,47 @@ class SingleLayerNeuralNetwork(torch.nn.Module):
         
         print(X_train.shape, X_test.shape, 
               y_train.shape, y_test.shape)
-        
-        
     
+    def get_hidden_act_function(self):
+        if self.nn_config_dict["hidden_layer_act"] == "relu":
+            return self.relu
+        elif self.nn_config_dict["hidden_layer_act"] == "tanh":
+            return self.tanh
+        elif self.nn_config_dict["hidden_layer_act"] == "sigmoid":
+            return self.sigmoid
+        else:
+            raise ValueError("{} is not a supported hidden layer activation function".format(self.nn_config_dict["hidden_layer_act"]))
+       
+    def get_final_act_function(self):
+        if self.nn_config_dict["final_layer_act"] == "softmax":
+            return self.softmax
+        else:
+            raise ValueError("{} is not a supported hidden layer activation function".format(self.nn_config_dict["final_layer_act"]))
+        
     def forward(self, x):
         hidden = self.fc1(x)
-        relu = self.relu(hidden)
-        output = self.fc2(relu)
-        output = output.exp()/output.exp().sum(-1).unsqueeze(-1)
+        act = self.hidden_act_func(hidden)
+        output = self.fc2(act)
+        output = self.softmax(output)
         return output
+
+    def set_data(self, df_train_node, train_label, df_test_node, test_label):
+        # dataset - load the entire dataset into memory
+        # 
+        X_train = df_train_node[[col for col in df_train_node.columns if col != 'label']].values
+        y_train = train_label.values
+        X_test = df_test_node[[col for col in df_test_node.columns if col != 'label']].values
+        y_test = test_label.values
+        X_train, y_train, X_test, y_test = map(torch.tensor, (X_train, y_train, X_test, y_test))
+
+        self.X_train = X_train.float()
+        self.y_train = y_train.long()
+        self.X_test = X_test.float()
+        self.y_test = y_test.long()
+        
+        
+        print(X_train.shape, X_test.shape, 
+              y_train.shape, y_test.shape)
 
 
 class TwoLayerNeuralNetwork(torch.nn.Module):
@@ -238,18 +359,29 @@ class TwoLayerNeuralNetwork(torch.nn.Module):
         self.y_train = None
         self.X_test = None
         self.y_test = None
+        self.nn_config_dict = {}
     
-    def initialize(self, hidden_size1, hidden_size2):
+    def initialize(self, nn_config_dict):
+        self.nn_config_dict = nn_config_dict
         super(TwoLayerNeuralNetwork, self).__init__()
         self.input_size = self.X_train.shape[1]
-        self.hidden_size1 = hidden_size1
-        self.hidden_size2 = hidden_size2
+        self.hidden_size1 = nn_config_dict["numhidden_1"]
+        self.hidden_size2 = nn_config_dict["numhidden_2"]
         self.fc1 = torch.nn.Linear(self.input_size, self.hidden_size1)
+        
+        # Define the activation functions to be used
+        self.tanh = torch.nn.Tanh()
         self.relu = torch.nn.ReLU()
+        self.sigmoid = torch.nn.Sigmoid()
+        self.softmax = softmax
+        
+        # Define hidden layer and final layer activastion functions
+        self.hidden_act_func = self.get_hidden_act_function()
+        self.final_act_func = self.get_final_act_function()
+
         self.fc2 = torch.nn.Linear(self.hidden_size1, self.hidden_size2)
         self.fc3 = torch.nn.Linear(self.hidden_size2, 2)
-        self.sigmoid = torch.nn.Sigmoid()
-    
+        
     def load_data(self, dataset, base_dir, feature_split, node_id=None):
         if node_id is None:
             train_filename = "{}_{}.csv".format(dataset, "train_binary")
@@ -292,16 +424,49 @@ class TwoLayerNeuralNetwork(torch.nn.Module):
         print(X_train.shape, X_test.shape, 
               y_train.shape, y_test.shape)
         
+    def get_hidden_act_function(self):
+        if self.nn_config_dict["hidden_layer_act"] == "relu":
+            return self.relu
+        elif self.nn_config_dict["hidden_layer_act"] == "tanh":
+            return self.tanh
+        elif self.nn_config_dict["hidden_layer_act"] == "sigmoid":
+            return self.sigmoid
+        else:
+            raise ValueError("{} is not a supported hidden layer activation function".format(self.nn_config_dict["hidden_layer_act"]))
+       
+    def get_final_act_function(self):
+        if self.nn_config_dict["final_layer_act"] == "softmax":
+            return self.softmax
+        else:
+            raise ValueError("{} is not a supported hidden layer activation function".format(self.nn_config_dict["final_layer_act"]))
         
-    
+        
     def forward(self, x):
         hidden1 = self.fc1(x)
-        relu1 = self.relu(hidden1)
-        hidden2 = self.fc2(relu1)
-        relu2 = self.relu(hidden2)
-        output = self.fc3(relu2)
-        output = output.exp()/output.exp().sum(-1).unsqueeze(-1)
+        act1 = self.hidden_act_func(hidden1)
+        hidden2 = self.fc2(act1)
+        act2 = self.hidden_act_func(hidden2)
+        output = self.fc3(act2)
+        output = self.final_act_func(output)
         return output
+
+    def set_data(self, df_train_node, train_label, df_test_node, test_label):
+        # dataset - load the entire dataset into memory
+        # 
+        X_train = df_train_node[[col for col in df_train_node.columns if col != 'label']].values
+        y_train = train_label.values
+        X_test = df_test_node[[col for col in df_test_node.columns if col != 'label']].values
+        y_test = test_label.values
+        X_train, y_train, X_test, y_test = map(torch.tensor, (X_train, y_train, X_test, y_test))
+
+        self.X_train = X_train.float()
+        self.y_train = y_train.long()
+        self.X_test = X_test.float()
+        self.y_test = y_test.long()
+        
+        
+        print(X_train.shape, X_test.shape, 
+              y_train.shape, y_test.shape)
 
 
 def test_cluster():

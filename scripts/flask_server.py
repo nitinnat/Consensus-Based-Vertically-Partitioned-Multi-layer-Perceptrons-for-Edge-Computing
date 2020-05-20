@@ -22,9 +22,20 @@ import os
 
 app = Flask(__name__)
 socketio = SocketIO(app)
-# This dictionary will store all the neural networks
-nn_cluster = NeuralNetworkCluster()
 
+# This dictionary will store all the neural networks
+base_dir = "C:/Users/nitin/eclipse-workspace/consensus-deep-learning-version-2.0/data"
+nn_cluster = NeuralNetworkCluster(base_dir)
+
+
+def save_results(op_path):
+    """
+    Stores a pickle file of the NeuralNetworkCluster object
+    """
+    global nn_cluster, base_dir
+    import pickle
+    pickle.dump(nn_cluster, open(os.path.join(op_path, "results.pkl"), "wb"))
+        
 @app.route('/')
 def hello_world():
     return 'Hello, World!'
@@ -44,23 +55,33 @@ def updateWPProject(command):
     print("Executing {} ".format(command))
     if flask.request.method == 'POST':
             nnconfig = flask.request.form['nnconfig']
-        
             
             if nnconfig:
                 try:
                     nnconfig_dict = json.loads(nnconfig)
-                    nnconfig_dict["model_type"] = "2-layer-nn"
-                    node_id = nnconfig_dict["node_id"]        
+                    nnconfig_dict["model_type"] = "1-layer-nn"
+                    node_id = nnconfig_dict["node_id"]
                     
-                    
+                    if command == "clear":
+                        NeuralNetworkCluster(base_dir)
+                        
                     if command == "init":
+                        if len(nn_cluster.neuralNetDict) == 0:
+                            num_nodes = int(nnconfig_dict["num_nodes"])
+                            if nnconfig_dict["feature_split_type"] == "overlap":
+                                nn_cluster.init_data(nnconfig_dict["dataset_name"], num_nodes,
+                                    nnconfig_dict["feature_split_type"], nnconfig_dict["random.seed"], nnconfig_dict["overlap_ratio"])
+                            else:
+                                nn_cluster.init_data(nnconfig_dict["dataset_name"], num_nodes,
+                                    nnconfig_dict["feature_split_type"], nnconfig_dict["random.seed"])
+                       
                         nn_cluster.appendNNToCluster(nnconfig_dict)
                     
                     if command == "train":
                         nn_cluster.train(node_id)
                         
                     if command == "calc_losses":
-                        nn_cluster.compute_losses()
+                        nn_cluster.compute_losses_and_accuracies()
                         
                     if command == "plot":
 #                        if node_id in neural_network_dict.keys():
@@ -77,28 +98,39 @@ def updateWPProject(command):
                             
                             train_losses = nn_cluster.neuralNetDict[node_id]["train_losses"]
                             test_losses = nn_cluster.neuralNetDict[node_id]["test_losses"]
+                            train_preds = nn_cluster.neuralNetDict[node_id]["train_preds"]
+                            test_preds = nn_cluster.neuralNetDict[node_id]["test_preds"]
                             nodes = [node_id]*len(train_losses)
                             iters = list(range(len(train_losses)))
-                            df = pd.DataFrame(data={"Node": nodes, "Iter": iters, "TrainLoss": train_losses, "TestLoss":test_losses})
+                            df = pd.DataFrame(data={"Node": nodes, "Iter": iters, 
+                                                    "TrainLoss": train_losses, "TestLoss":test_losses,
+                                                    "TrainPreds": train_preds, "TestPreds":test_preds})
                             loss_df = loss_df.append(df)
                             
-                        base_dir = "C:/Users/nitin/eclipse-workspace/consensus-deep-learning-version-2.0/data/"
-                        loss_df.to_csv(os.path.join(base_dir, 
-                                                    nnconfig_dict["dataset_name"], 
-                                                    "feature_split_" + str(nnconfig_dict["feature_split"]), 
-                                                    "{}_TrainLosses.csv".format(nnconfig_dict["runtype"])), index=False)
+                        op_path = os.path.join(base_dir, nnconfig_dict["dataset_name"])
+                        
+                        if not os.path.exists(op_path):
+                            os.makedirs(op_path)
+                        loss_df.to_csv(os.path.join(op_path,"{}_TrainLosses_{}.csv".format(nnconfig_dict["run_type"], nnconfig_dict["run"])), index=False)
                         print("Node: {}: {}".format(0, nn_cluster.neuralNetDict[0]["train_losses"]))
                         
                     if command == "gossip":
                         # Gossip only works for runtype == "distributed"
                         neighbor_node_id = nnconfig_dict["neighbor"]
-                        assert nnconfig_dict["runtype"] == "distributed", "Cannot gossip in centralized setting"
+                        assert nnconfig_dict["run_type"] == "distributed", "Cannot gossip in centralized setting"
 
                         # Perform gossip with neighbor's dict as the parameter and update both neural networks
                         print("Node {} is gossipping with node {}.".format(node_id, neighbor_node_id))
                         nn_cluster.gossip(node_id, neighbor_node_id)
-
+                    
+                    if command == "save_results":
+                        op_path = os.path.join(base_dir, nnconfig_dict["dataset_name"])
+                        save_results(op_path, nnconfig_dict)
+                        print("saved results")
+                        
                     print("Number of neural networks currently existing: {}".format(len(nn_cluster.neuralNetDict.keys())))
+                    
+                
                 except Exception as e:
                     track = traceback.format_exc()
                     print(track)
