@@ -73,6 +73,7 @@ public class PegasosNode implements Node {
 	private static final String PAR_RUN_TYPE = "run_type";
 	private static final String PAR_NEIGHBOR = "neighbor";
 	
+
 	
 	private static long counterID = -1; // used to generate unique IDs 
 	protected Protocol[] protocol = null; //The protocols on this node.
@@ -122,6 +123,7 @@ public class PegasosNode implements Node {
 	public String final_layer_activation;
 	public String feature_split_type;
 	public double overlap_ratio;
+
 	public String nn_type;
 	public int num_layers;
 	String dataset_name;
@@ -186,8 +188,7 @@ public class PegasosNode implements Node {
 		num_layers = Configuration.getInt(PAR_NUM_LAYERS); // number of hidden layers
 		num_run = Configuration.getInt(PAR_RUN); // number of hidden layers
 		dataset_name = Configuration.getString(PAR_DATASET_NAME); // number of hidden layers
-		
-		
+	
 		
 		CommonState.setNode(this);
 		ID = nextID();
@@ -239,6 +240,7 @@ public class PegasosNode implements Node {
         // Create base NN on the Python side using these configurations
         // Create a JSON object with configurations
         JsonObject nnconfig = new JsonObject();
+
         nnconfig.addProperty(PAR_LEARNING_RATE, learning_rate);
         nnconfig.addProperty(PAR_BATCH_SIZE, batch_size);
         nnconfig.addProperty(PAR_INITIALIZATION, initmethod);
@@ -259,6 +261,7 @@ public class PegasosNode implements Node {
         nnconfig.addProperty(PAR_DATASET_NAME, dataset_name);
         nnconfig.addProperty(PAR_NODE_ID, result.getID());
         nnconfig.addProperty(PAR_NUM_NODES, Network.size());
+
         if (Network.size() == 1) {
         	nnconfig.addProperty(PAR_RUN_TYPE, "centralized");
         }
