@@ -29,12 +29,9 @@ warnings.filterwarnings('ignore')
 # Todo: data loading should be done in another class
 # Todo: Make each model into a class and pass this into higher NNTrainer class
 
-<<<<<<< HEAD
 def softmax(t):
     return t.exp()/t.exp().sum(-1).unsqueeze(-1)
     
-=======
->>>>>>> 1be9478b0c2b8de4ed8c45e3bf2c14655df4f63a
 
 
 class NeuralNetworkCluster:
@@ -101,37 +98,21 @@ class NeuralNetworkCluster:
         if node_id in self.neuralNetDict.keys():
             logging.info("node_id: {} already exists in dictionary. Overwriting...".format(node_id))
         
-<<<<<<< HEAD
+
         dataset = nn_config["dataset_name"]        
         if nn_config["num_layers"] == 1:
-=======
-        dataset = nn_config["dataset_name"]
-        feature_split = nn_config["feature_split"]
-        
-        if nn_config["model_type"] == "1-layer-nn":
->>>>>>> 1be9478b0c2b8de4ed8c45e3bf2c14655df4f63a
             model = SingleLayerNeuralNetwork()
             df_train_node = self.df_train.iloc[:, self.feature_dict[node_id]]
             df_test_node = self.df_test.iloc[:, self.feature_dict[node_id]]
             model.set_data(df_train_node,  self.df_train['label'], df_test_node, self.df_test['label'])
-<<<<<<< HEAD
             model.initialize(nn_config)
 
         if nn_config["num_layers"] == 2:
-=======
-            model.initialize(50)
-
-        if nn_config["model_type"] == "2-layer-nn":
->>>>>>> 1be9478b0c2b8de4ed8c45e3bf2c14655df4f63a
             model = TwoLayerNeuralNetwork()
             df_train_node = self.df_train.iloc[:, self.feature_dict[node_id]]
             df_test_node = self.df_test.iloc[:, self.feature_dict[node_id]]
             model.set_data(df_train_node,  self.df_train['label'], df_test_node, self.df_test['label'])
-<<<<<<< HEAD
             model.initialize(nn_config)
-=======
-            model.initialize(50, 25)
->>>>>>> 1be9478b0c2b8de4ed8c45e3bf2c14655df4f63a
         
         self.neuralNetDict[node_id]["model"] = model
         
@@ -215,10 +196,6 @@ class NeuralNetworkCluster:
             # Compute Train Loss
             y_pred_train = model(model.X_train)
             y_pred_train = y_pred_train.squeeze()
-            print(y_pred_train)
-            import sys
-            sys.exit()
-            
             train_loss = criterion(y_pred_train, model.y_test) 
             self.neuralNetDict[node_id]["train_losses"].append(train_loss.item())
             
@@ -227,17 +204,12 @@ class NeuralNetworkCluster:
             y_pred_test = y_pred_test.squeeze()
             test_loss = criterion(y_pred_test, model.y_test)        
             self.neuralNetDict[node_id]["test_losses"].append(test_loss.item())
-<<<<<<< HEAD
-            
             if node_id == 0:
                 y_pred_train_agg = y_pred_train
                 y_pred_test_agg = y_pred_test
             else:
                 y_pred_train_agg += y_pred_train
                 y_pred_test_agg += y_pred_test
-=======
-
->>>>>>> 1be9478b0c2b8de4ed8c45e3bf2c14655df4f63a
     # def set_data(df_train_node, df_test_node):
     #     # dataset - load the entire dataset into memory
     #     # 
@@ -294,13 +266,13 @@ class SingleLayerNeuralNetwork(torch.nn.Module):
         self.final_act_func = self.get_final_act_function()
     
     def load_data(self, dataset, base_dir, feature_split, node_id=None):
-        # if node_id is None:
-        #     train_filename = "{}_{}.csv".format(dataset, "train_binary")
-        #     test_filename = "{}_{}.csv".format(dataset, "test_binary")
+         if node_id is None:
+             train_filename = "{}_{}.csv".format(dataset, "train_binary")
+             test_filename = "{}_{}.csv".format(dataset, "test_binary")
         
-        # else:
-        #     train_filename = "{}_{}_{}.csv".format(dataset, "train", node_id)
-        #     test_filename = "{}_{}_{}.csv".format(dataset, "test", node_id)
+         else:
+             train_filename = "{}_{}_{}.csv".format(dataset, "train", node_id)
+             test_filename = "{}_{}_{}.csv".format(dataset, "test", node_id)
         
         df_train = pd.read_csv(os.path.join(base_dir, 
                                       dataset, 
@@ -334,8 +306,6 @@ class SingleLayerNeuralNetwork(torch.nn.Module):
         
         print(X_train.shape, X_test.shape, 
               y_train.shape, y_test.shape)
-<<<<<<< HEAD
-    
     def get_hidden_act_function(self):
         if self.nn_config_dict["hidden_layer_act"] == "relu":
             return self.relu
@@ -351,10 +321,7 @@ class SingleLayerNeuralNetwork(torch.nn.Module):
             return self.softmax
         else:
             raise ValueError("{} is not a supported hidden layer activation function".format(self.nn_config_dict["final_layer_act"]))
-        
-=======
                     
->>>>>>> 1be9478b0c2b8de4ed8c45e3bf2c14655df4f63a
     def forward(self, x):
         hidden = self.fc1(x)
         act = self.hidden_act_func(hidden)
