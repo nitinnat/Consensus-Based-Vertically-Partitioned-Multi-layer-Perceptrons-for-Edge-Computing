@@ -45,13 +45,11 @@ class NeuralNetworkCluster:
         self.base_dir = base_dir
         # This will store feature indices for each node - determined by overlap functionality
         self.featureDict = {1: []}
-<<<<<<< Updated upstream
         self.epoch = 0
-=======
         self.convergence_epsilon = 0
         self.convergence_iters = 0
         self.converged_iters = 0
->>>>>>> Stashed changes
+
     
     def init_data(self, nn_config):# dataset, num_nodes, feature_split_type, nn_config["random_seed"], overlap_ratio=None):
         random.seed(nn_config["random_seed"])
