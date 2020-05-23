@@ -129,9 +129,7 @@ class NeuralNetworkCluster:
         
         self.neuralNetDict[node_id]["train_losses"] = []
         self.neuralNetDict[node_id]["test_losses"] = []
-        self.neuralNetDict[node_id]["train_preds"] = []
-        self.neuralNetDict[node_id]["test_preds"] = []
-        
+
     def gossip(self, node_id, neighbor_node_id):
         """
         Performs gossip on two given node_ids.
@@ -266,14 +264,14 @@ class SingleLayerNeuralNetwork(torch.nn.Module):
         self.final_act_func = self.get_final_act_function()
     
     def load_data(self, dataset, base_dir, feature_split, node_id=None):
-         if node_id is None:
-             train_filename = "{}_{}.csv".format(dataset, "train_binary")
-             test_filename = "{}_{}.csv".format(dataset, "test_binary")
-        
-         else:
-             train_filename = "{}_{}_{}.csv".format(dataset, "train", node_id)
-             test_filename = "{}_{}_{}.csv".format(dataset, "test", node_id)
-        
+#         if node_id is None:
+#             train_filename = "{}_{}.csv".format(dataset, "train_binary")
+#             test_filename = "{}_{}.csv".format(dataset, "test_binary")
+#        
+#         else:
+#             train_filename = "{}_{}_{}.csv".format(dataset, "train", node_id)
+#             test_filename = "{}_{}_{}.csv".format(dataset, "test", node_id)
+#        
         df_train = pd.read_csv(os.path.join(base_dir, 
                                       dataset, 
                                       "feature_split_" + str(feature_split),

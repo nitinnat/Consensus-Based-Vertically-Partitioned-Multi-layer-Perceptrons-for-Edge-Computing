@@ -180,7 +180,7 @@ public class GadgetProtocol implements CDProtocol {
 			if (CDState.getCycle() == cycles-1) {
 				// plot loss curve
 				System.out.println("Cycles New " + cycles);
-				HTTPSendDetailsAtOnce.sendRequest("vpnn", "plot", pn.nnconfig);
+//				HTTPSendDetailsAtOnce.sendRequest("vpnn", "plot", pn.nnconfig);
 //				HTTPSendDetailsAtOnce.sendRequest("vpnn", "save_results", pn.nnconfig);
 			}
 			
@@ -203,7 +203,7 @@ public class GadgetProtocol implements CDProtocol {
 				if (pn.getID() == Network.size()-1) {
 					
 					HTTPSendDetailsAtOnce.sendRequest("vpnn", "calc_losses", pn.nnconfig);
-					HTTPSendDetailsAtOnce.sendRequest("vpnn", "plot", pn.nnconfig);
+//					HTTPSendDetailsAtOnce.sendRequest("vpnn", "plot", pn.nnconfig);
 //					HTTPSendDetailsAtOnce.sendRequest("vpnn", "save_results", pn.nnconfig);
 				}
 				

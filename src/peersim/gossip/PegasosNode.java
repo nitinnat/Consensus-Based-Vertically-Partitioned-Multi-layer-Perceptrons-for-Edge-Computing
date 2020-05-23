@@ -229,6 +229,7 @@ public class PegasosNode implements Node {
 			CommonState.setPid(i);
 			result.protocol[i] = (Protocol)protocol[i].clone();
 		}
+		System.out.println("Network Size "+ Network.size());
 		System.out.println("creating node with ID: " + result.getID());
 		
 		// Determine base dataset name

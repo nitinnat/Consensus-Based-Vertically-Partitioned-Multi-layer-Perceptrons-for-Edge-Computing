@@ -61,7 +61,9 @@ def updateWPProject(command):
                     node_id = nnconfig_dict["node_id"]
                     
                     if command == "clear":
-                        NeuralNetworkCluster(base_dir)
+                        global nn_cluster
+                        nn_cluster = NeuralNetworkCluster(base_dir)
+                        
                         
                     if command == "init":
                         if len(nn_cluster.neuralNetDict) == 0:
@@ -96,13 +98,10 @@ def updateWPProject(command):
                             
                             train_losses = nn_cluster.neuralNetDict[node_id]["train_losses"]
                             test_losses = nn_cluster.neuralNetDict[node_id]["test_losses"]
-                            train_preds = nn_cluster.neuralNetDict[node_id]["train_preds"]
-                            test_preds = nn_cluster.neuralNetDict[node_id]["test_preds"]
                             nodes = [node_id]*len(train_losses)
                             iters = list(range(len(train_losses)))
                             df = pd.DataFrame(data={"Node": nodes, "Iter": iters, 
-                                                    "TrainLoss": train_losses, "TestLoss":test_losses,
-                                                    "TrainPreds": train_preds, "TestPreds":test_preds})
+                                                    "TrainLoss": train_losses, "TestLoss":test_losses})
                             loss_df = loss_df.append(df)
                             
                         op_path = os.path.join(base_dir, nnconfig_dict["dataset_name"])
