@@ -45,17 +45,26 @@ class NeuralNetworkCluster:
         self.base_dir = base_dir
         # This will store feature indices for each node - determined by overlap functionality
         self.featureDict = {1: []}
+<<<<<<< Updated upstream
         self.epoch = 0
+=======
+        self.convergence_epsilon = 0
+        self.convergence_iters = 0
+        self.converged_iters = 0
+>>>>>>> Stashed changes
     
-    def init_data(self, dataset, num_nodes, feature_split_type, random_seed, overlap_ratio=None):
-        random.seed(random_seed)
-        train_filename = "{}_{}.csv".format(dataset, "train_binary")
-        test_filename = "{}_{}.csv".format(dataset, "test_binary")
+    def init_data(self, nn_config):# dataset, num_nodes, feature_split_type, nn_config["random_seed"], overlap_ratio=None):
+        random.seed(nn_config["random_seed"])
+        train_filename = "{}_{}.csv".format(nn_config["dataset_name"], "train_binary")
+        test_filename = "{}_{}.csv".format(nn_config["dataset_name"], "test_binary")
+
+        self.convergence_epsilon = nn_config["convergence_epsilon"]
+        self.convergence_iters = nn_config["convergence_iters"]
         
-        self.df_train = pd.read_csv(os.path.join(self.base_dir, dataset,train_filename))
-        self.df_test = pd.read_csv(os.path.join(self.base_dir, dataset,test_filename))
-        
-        if feature_split_type == "random" :
+        self.df_train = pd.read_csv(os.path.join(self.base_dir, nn_config["dataset_name"], train_filename))
+        self.df_test = pd.read_csv(os.path.join(self.base_dir, nn_config["dataset_name"], test_filename))
+        num_nodes = int(nnconfig_dict["num_nodes"])
+        if nn_config["feature_split_type"] == "random" :
             used_indices = []
             num_features = len([col for col in self.df_train.columns if col not in ['label']])
             num_features_split = int(np.ceil(num_features / float(num_nodes)))
@@ -70,11 +79,11 @@ class NeuralNetworkCluster:
                 idx_dict[split] = idx
                 used_indices = used_indices + idx
 
-        elif feature_split_type == "overlap":
+        elif nn_config["feature_split_type"] == "overlap":
             used_indices = []
             num_features = len([col for col in self.df_train.columns if col not in ['label']])
             num_features_split = int(np.ceil(num_features / float(num_nodes)))
-            num_features_overlap = int(np.ceil(overlap_ratio*num_features_split))
+            num_features_overlap = int(np.ceil(nn_config["overlap_ratio"]*num_features_split))
             num_features_split = num_features_split - num_features_overlap
 
             overlap_features = random.sample([i for i in range(num_features)], num_features_overlap)
@@ -134,6 +143,9 @@ class NeuralNetworkCluster:
         """
         Performs gossip on two given node_ids.
         """
+        if self.converged_iters >= self.convergence_iters:
+            return
+
         model0 = self.neuralNetDict[node_id]["model"]
         model1 = self.neuralNetDict[neighbor_node_id]["model"]
         
@@ -162,6 +174,11 @@ class NeuralNetworkCluster:
         loss0 = criterion0(y_pred_mean0.squeeze(), model0.y_train)
         loss1 = criterion1(y_pred_mean1.squeeze(), model1.y_train)
        
+        if loss0.item() < self.convergence_epsilon:
+            self.converged_iters += 1
+        else:
+            self.converged_iters = 0
+
         # Backward pass
         loss0.backward(retain_graph=True)
         loss1.backward(retain_graph=True)

@@ -70,13 +70,8 @@ def updateWPProject(command):
                     if command == "init":
                         if len(nn_cluster.neuralNetDict) == 0:
                             num_nodes = int(nnconfig_dict["num_nodes"])
-                            if nnconfig_dict["feature_split_type"] == "overlap":
-                                nn_cluster.init_data(nnconfig_dict["dataset_name"], num_nodes,
-                                    nnconfig_dict["feature_split_type"], nnconfig_dict["random.seed"], nnconfig_dict["overlap_ratio"])
-                            else:
-                                nn_cluster.init_data(nnconfig_dict["dataset_name"], num_nodes,
-                                    nnconfig_dict["feature_split_type"], nnconfig_dict["random.seed"])
-                       
+
+                            nn_cluster.init_data(nnconfig)
                         nn_cluster.appendNNToCluster(nnconfig_dict)
                     
                     if command == "train":

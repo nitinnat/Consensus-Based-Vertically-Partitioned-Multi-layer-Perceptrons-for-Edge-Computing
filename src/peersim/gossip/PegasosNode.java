@@ -263,6 +263,7 @@ public class PegasosNode implements Node {
         nnconfig.addProperty(PAR_NODE_ID, result.getID());
         nnconfig.addProperty(PAR_NUM_NODES, Network.size());
 
+
         if (Network.size() == 1) {
         	nnconfig.addProperty(PAR_RUN_TYPE, "centralized");
         }

@@ -126,7 +126,6 @@ def unpickle(file):
 def split_random(df_train, df_test, numsplits):
 	used_indices = []
 	
-
 	df_train_splits = []
 	df_test_splits = []
 
