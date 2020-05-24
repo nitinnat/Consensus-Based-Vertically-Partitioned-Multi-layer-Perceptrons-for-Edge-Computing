@@ -223,7 +223,9 @@ public class Simulator {
 
 		System.out.println(basePath.toString());
 		for (File file : files) {
+			
 			if (!file.isDirectory()) {
+				
 				System.out.println("Running with config file: " + file.getName());
 				Path filePath = Paths.get(basePath.toString(), file.getName());
 
@@ -239,7 +241,7 @@ public class Simulator {
 					System.setOut(newout);
 
 				int exps = Configuration.getInt(PAR_EXPS, 1);
-
+				long seed  = Configuration.getLong("random.seed", 12345);
 				final int SIMID = getSimID();
 				if (SIMID == UNKNOWN) {
 
@@ -250,10 +252,11 @@ public class Simulator {
 				try {
 
 					for (int k = 0; k < exps; ++k) {
-						if (k > 0) {
-							long seed = CommonState.r.nextLong();
-							CommonState.initializeRandom(seed);
-						}
+//						if (k > 0) {
+//							long seed = CommonState.r.nextLong();
+//							CommonState.initializeRandom(seed);
+//						}
+						CommonState.initializeRandom(seed);
 						System.err.print("Simulator: starting experiment " + k);
 						System.err.println(" invoking " + simName[SIMID]);
 						System.err.println("Random seed: " + CommonState.r.getLastSeed());

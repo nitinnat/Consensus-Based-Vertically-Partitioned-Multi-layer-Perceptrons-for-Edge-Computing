@@ -101,7 +101,7 @@ public class PegasosNode implements Node {
 	 * The ID of the node. It should be final, however it can't be final because
 	 * clone must be able to set it.
 	 */
-	private long ID;
+	public long ID;
 
 	/**
 	 * The prefix for the resources file. All the resources file will be in prefix 
@@ -278,7 +278,7 @@ public class PegasosNode implements Node {
         System.out.println(nnconfig.toString());
         
         // Send 'clear' command to clear existing neural net cluster
-        if (node_id == 0) {
+        if (result.getID() == 0) {
         	HTTPSendDetailsAtOnce.sendRequest("vpnn", "clear", nnconfig);
         }
         // Send the 'init' http command to setup NNs

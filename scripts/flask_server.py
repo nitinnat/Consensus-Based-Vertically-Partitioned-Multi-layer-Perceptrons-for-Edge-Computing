@@ -58,7 +58,9 @@ def updateWPProject(command):
             if nnconfig:
                 try:
                     nnconfig_dict = json.loads(nnconfig)
-                    node_id = nnconfig_dict["node_id"]
+                    # doing a mod here because Peersim does not reset pegasosnode counter
+                    node_id = nnconfig_dict["node_id"]%nnconfig_dict["num_nodes"]
+                    
                     
                     if command == "clear":
                         global nn_cluster
@@ -113,7 +115,7 @@ def updateWPProject(command):
                         
                     if command == "gossip":
                         # Gossip only works for runtype == "distributed"
-                        neighbor_node_id = nnconfig_dict["neighbor"]
+                        neighbor_node_id = nnconfig_dict["neighbor"]%nnconfig_dict["num_nodes"]
                         assert nnconfig_dict["run_type"] == "distributed", "Cannot gossip in centralized setting"
 
                         # Perform gossip with neighbor's dict as the parameter and update both neural networks
