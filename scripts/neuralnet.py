@@ -54,6 +54,7 @@ class NeuralNetworkCluster:
     
     def init_data(self, nn_config):# dataset, num_nodes, feature_split_type, nn_config["random_seed"], overlap_ratio=None):
         print(nn_config)
+        self.nn_config = nn_config
         random.seed(int(nn_config["random.seed"]))
         train_filename = "{}_{}.csv".format(nn_config["dataset_name"], "train_binary")
         test_filename = "{}_{}.csv".format(nn_config["dataset_name"], "test_binary")
@@ -250,8 +251,8 @@ class NeuralNetworkCluster:
                 y_pred_train_agg += y_pred_train
                 y_pred_test_agg += y_pred_test
         df = pd.DataFrame({'node': nodes, 'iter': iters, 'test_loss': nodes_losses, 'test_accuracy': nodes_accuracy})
-        df.to_csv(self.base_dir + 'results.csv', index=False)
-        print(self.base_dir)
+        df.to_csv(self.base_dir + '/' + self.nn_config['resourcepath'] + '/results/'+ 'results_{0}.csv'.format(self.nn_config['run']), index=False)
+        print(self.nn_config['run'])
 
 
     # def set_data(df_train_node, df_test_node):

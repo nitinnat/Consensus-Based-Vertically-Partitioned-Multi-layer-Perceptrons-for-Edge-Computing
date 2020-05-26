@@ -114,8 +114,8 @@ def updateWPProject(command):
                         assert nnconfig_dict["run_type"] == "distributed", "Cannot gossip in centralized setting"
 
                         # Perform gossip with neighbor's dict as the parameter and update both neural networks
-                        print("Node {} is gossipping with node {}.".format(node_id, neighbor_node_id))
-                        nn_cluster.gossip(node_id, neighbor_node_id)
+                        print("Node {} is gossipping with node {}.".format(nnconfig_dict["node_id"] , neighbor_node_id))
+                        nn_cluster.gossip( nnconfig_dict["node_id"] , neighbor_node_id)
                     
                     if command == "save_results":
                         op_path = os.path.join(base_dir, nnconfig_dict["dataset_name"])
