@@ -24,7 +24,7 @@ app = Flask(__name__)
 socketio = SocketIO(app)
 
 # This dictionary will store all the neural networks
-base_dir = "C:/Users/nitin/eclipse-workspace/consensus-deep-learning-version-2.0/data"
+base_dir = "/Users/saurabh7/RA/consensus-deep-learning-version-2.0/data"
 nn_cluster = NeuralNetworkCluster(base_dir)
 
 def save_results(op_path):
@@ -59,7 +59,7 @@ def updateWPProject(command):
                 try:
                     nnconfig_dict = json.loads(nnconfig)
                     # doing a mod here because Peersim does not reset pegasosnode counter
-                    node_id = nnconfig_dict["node_id"]%nnconfig_dict["num_nodes"]
+                    nnconfig_dict["node_id"] = nnconfig_dict["node_id"]%nnconfig_dict["num_nodes"]
                     
                     
                     if command == "clear":
@@ -71,7 +71,7 @@ def updateWPProject(command):
                         if len(nn_cluster.neuralNetDict) == 0:
                             num_nodes = int(nnconfig_dict["num_nodes"])
 
-                            nn_cluster.init_data(nnconfig)
+                            nn_cluster.init_data(nnconfig_dict)
                         nn_cluster.appendNNToCluster(nnconfig_dict)
                     
                     if command == "train":
