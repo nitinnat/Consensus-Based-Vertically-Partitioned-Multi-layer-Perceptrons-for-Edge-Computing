@@ -24,7 +24,7 @@ app = Flask(__name__)
 socketio = SocketIO(app)
 
 # This dictionary will store all the neural networks
-base_dir = "C:/Users/nitin/eclipse-workspace/consensus-deep-learning-version-2.0/data"
+base_dir = "/Users/saurabh7/RA/consensus-deep-learning-version-2.0/data"
 nn_cluster = NeuralNetworkCluster(base_dir)
 
 def save_results(op_path):
@@ -59,7 +59,7 @@ def updateWPProject(command):
                 try:
                     nnconfig_dict = json.loads(nnconfig)
                     # doing a mod here because Peersim does not reset pegasosnode counter
-                    node_id = nnconfig_dict["node_id"]%nnconfig_dict["num_nodes"]
+                    nnconfig_dict["node_id"] = nnconfig_dict["node_id"]%nnconfig_dict["num_nodes"]
                     
                     
                     if command == "clear":
@@ -70,13 +70,8 @@ def updateWPProject(command):
                     if command == "init":
                         if len(nn_cluster.neuralNetDict) == 0:
                             num_nodes = int(nnconfig_dict["num_nodes"])
-                            if nnconfig_dict["feature_split_type"] == "overlap":
-                                nn_cluster.init_data(nnconfig_dict["dataset_name"], num_nodes,
-                                    nnconfig_dict["feature_split_type"], nnconfig_dict["random.seed"], nnconfig_dict["overlap_ratio"])
-                            else:
-                                nn_cluster.init_data(nnconfig_dict["dataset_name"], num_nodes,
-                                    nnconfig_dict["feature_split_type"], nnconfig_dict["random.seed"])
-                       
+
+                            nn_cluster.init_data(nnconfig_dict)
                         nn_cluster.appendNNToCluster(nnconfig_dict)
                     
                     if command == "train":
@@ -119,8 +114,8 @@ def updateWPProject(command):
                         assert nnconfig_dict["run_type"] == "distributed", "Cannot gossip in centralized setting"
 
                         # Perform gossip with neighbor's dict as the parameter and update both neural networks
-                        print("Node {} is gossipping with node {}.".format(node_id, neighbor_node_id))
-                        nn_cluster.gossip(node_id, neighbor_node_id)
+                        print("Node {} is gossipping with node {}.".format(nnconfig_dict["node_id"] , neighbor_node_id))
+                        nn_cluster.gossip( nnconfig_dict["node_id"] , neighbor_node_id)
                     
                     if command == "save_results":
                         op_path = os.path.join(base_dir, nnconfig_dict["dataset_name"])

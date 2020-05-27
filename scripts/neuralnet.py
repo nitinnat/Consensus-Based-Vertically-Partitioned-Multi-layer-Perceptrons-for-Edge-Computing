@@ -13,6 +13,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, mean_squared_error, log_loss
 import random
+import pandas as pd
 
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.datasets import make_blobs
@@ -46,16 +47,25 @@ class NeuralNetworkCluster:
         # This will store feature indices for each node - determined by overlap functionality
         self.featureDict = {1: []}
         self.epoch = 0
+        self.convergence_epsilon = 0
+        self.convergence_iters = 0
+        self.converged_iters = 0
+
     
-    def init_data(self, dataset, num_nodes, feature_split_type, random_seed, overlap_ratio=None):
-        random.seed(random_seed)
-        train_filename = "{}_{}.csv".format(dataset, "train_binary")
-        test_filename = "{}_{}.csv".format(dataset, "test_binary")
+    def init_data(self, nn_config):# dataset, num_nodes, feature_split_type, nn_config["random_seed"], overlap_ratio=None):
+        print(nn_config)
+        self.nn_config = nn_config
+        random.seed(int(nn_config["random.seed"]))
+        train_filename = "{}_{}.csv".format(nn_config["dataset_name"], "train_binary")
+        test_filename = "{}_{}.csv".format(nn_config["dataset_name"], "test_binary")
+
+        self.convergence_epsilon = nn_config["convergence_epsilon"]
+        self.convergence_iters = nn_config["cycles_for_convergence"]
         
-        self.df_train = pd.read_csv(os.path.join(self.base_dir, dataset,train_filename))
-        self.df_test = pd.read_csv(os.path.join(self.base_dir, dataset,test_filename))
-        
-        if feature_split_type == "random" :
+        self.df_train = pd.read_csv(os.path.join(self.base_dir, nn_config["dataset_name"], train_filename))
+        self.df_test = pd.read_csv(os.path.join(self.base_dir, nn_config["dataset_name"], test_filename))
+        num_nodes = int(nn_config["num_nodes"])
+        if nn_config["feature_split_type"] == "random" :
             used_indices = []
             num_features = len([col for col in self.df_train.columns if col not in ['label']])
             num_features_split = int(np.ceil(num_features / float(num_nodes)))
@@ -70,11 +80,11 @@ class NeuralNetworkCluster:
                 idx_dict[split] = idx
                 used_indices = used_indices + idx
 
-        elif feature_split_type == "overlap":
+        elif nn_config["feature_split_type"] == "overlap":
             used_indices = []
             num_features = len([col for col in self.df_train.columns if col not in ['label']])
             num_features_split = int(np.ceil(num_features / float(num_nodes)))
-            num_features_overlap = int(np.ceil(overlap_ratio*num_features_split))
+            num_features_overlap = int(np.ceil(nn_config["overlap_ratio"]*num_features_split))
             num_features_split = num_features_split - num_features_overlap
 
             overlap_features = random.sample([i for i in range(num_features)], num_features_overlap)
@@ -129,11 +139,15 @@ class NeuralNetworkCluster:
         
         self.neuralNetDict[node_id]["train_losses"] = []
         self.neuralNetDict[node_id]["test_losses"] = []
+        self.neuralNetDict[node_id]["test_accuracy"] = []
 
     def gossip(self, node_id, neighbor_node_id):
         """
         Performs gossip on two given node_ids.
         """
+        if self.converged_iters >= self.convergence_iters:
+            return
+
         model0 = self.neuralNetDict[node_id]["model"]
         model1 = self.neuralNetDict[neighbor_node_id]["model"]
         
@@ -162,6 +176,11 @@ class NeuralNetworkCluster:
         loss0 = criterion0(y_pred_mean0.squeeze(), model0.y_train)
         loss1 = criterion1(y_pred_mean1.squeeze(), model1.y_train)
        
+        if loss0.item() < self.convergence_epsilon:
+            self.converged_iters += 1
+        else:
+            self.converged_iters = 0
+
         # Backward pass
         loss0.backward(retain_graph=True)
         loss1.backward(retain_graph=True)
@@ -184,9 +203,13 @@ class NeuralNetworkCluster:
         """
         y_pred_train_agg = None
         y_pred_test_agg = None
+
+        nodes = []
+        iters = []
+        nodes_losses = []
+        nodes_accuracy = []
         
         for node_id in self.neuralNetDict.keys():
-            
             
             model = self.neuralNetDict[node_id]["model"]
             criterion = self.neuralNetDict[node_id]["criterion"]        
@@ -200,14 +223,38 @@ class NeuralNetworkCluster:
             # Compute Test Loss
             y_pred_test = model(model.X_test)
             y_pred_test = y_pred_test.squeeze()
-            test_loss = criterion(y_pred_test, model.y_test)        
+            test_loss = criterion(y_pred_test, model.y_test)
+            print(y_pred_test[:, 1])
+            print(y_pred_test[:, 1] > 0.5)
+            output = (y_pred_test[:, 1]>0.5).float()
+            print(output)
+            correct = (output == model.y_test).float().sum()
+            accuracy = correct/model.X_test.shape[0]
+
             self.neuralNetDict[node_id]["test_losses"].append(test_loss.item())
+            self.neuralNetDict[node_id]["test_accuracy"].append(accuracy.item())
+
+            iters += [i for i in range(len(self.neuralNetDict[node_id]["test_losses"]))]
+            nodes += [node_id]*len(self.neuralNetDict[node_id]["test_losses"])
+            nodes_losses += self.neuralNetDict[node_id]["test_losses"]
+            nodes_accuracy += self.neuralNetDict[node_id]["test_accuracy"]
+
+            print(iters)
+            print(nodes)
+            # print(len(nodes), len(iters), len(node_losses), len(nodes_accuracy))
+
+
             if node_id == 0:
                 y_pred_train_agg = y_pred_train
                 y_pred_test_agg = y_pred_test
             else:
                 y_pred_train_agg += y_pred_train
                 y_pred_test_agg += y_pred_test
+        df = pd.DataFrame({'node': nodes, 'iter': iters, 'test_loss': nodes_losses, 'test_accuracy': nodes_accuracy})
+        df.to_csv(self.base_dir + '/' + self.nn_config['resourcepath'] + '/results/'+ 'results_{0}.csv'.format(self.nn_config['run']), index=False)
+        print(self.nn_config['run'])
+
+
     # def set_data(df_train_node, df_test_node):
     #     # dataset - load the entire dataset into memory
     #     # 
