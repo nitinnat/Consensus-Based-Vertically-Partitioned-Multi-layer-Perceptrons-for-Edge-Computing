@@ -166,24 +166,20 @@ public class GadgetProtocol implements CDProtocol {
 		if (Network.size() == 1) {
 			if(!pn.converged) {
 				// Get response object and check for convergence, update pn.converged
-				HTTPSendDetailsAtOnce.sendRequest("vpnn", "train", pn.nnconfig);
+				boolean response = HTTPSendDetailsAtOnce.sendRequest("vpnn", "train", pn.nnconfig);
+				System.out.println("Response from GP: "+ response);
+				pn.converged = response; // Update converged flag
+				
+				// Compute loss
+				HTTPSendDetailsAtOnce.sendRequest("vpnn", "calc_losses", pn.nnconfig);
+				
+				
 			}
+			
 			else {
-				// Don't do anything here
-				HTTPSendDetailsAtOnce.sendRequest("vpnn", "train", pn.nnconfig);
+				
+				System.out.println("Node " + pn.getID() + " has converged.");
 			}
-			
-			// Compute loss
-			HTTPSendDetailsAtOnce.sendRequest("vpnn", "calc_losses", pn.nnconfig);
-			
-			
-			if (CDState.getCycle() == cycles-1) {
-				// plot loss curve
-				System.out.println("Cycles New " + cycles);
-//				HTTPSendDetailsAtOnce.sendRequest("vpnn", "plot", pn.nnconfig);
-//				HTTPSendDetailsAtOnce.sendRequest("vpnn", "save_results", pn.nnconfig);
-			}
-			
 			
 		}
 	
@@ -199,14 +195,18 @@ public class GadgetProtocol implements CDProtocol {
 				
 				// Send a command called gossip - which will use the current node ID, and neighbor ID
 				// and do feedforward on both -  share losses and then backpropagate on both
-				HTTPSendDetailsAtOnce.sendRequest("vpnn", "gossip", pn.nnconfig);
-				if (pn.getID() == Network.size()-1) {
-					
-					HTTPSendDetailsAtOnce.sendRequest("vpnn", "calc_losses", pn.nnconfig);
-//					HTTPSendDetailsAtOnce.sendRequest("vpnn", "plot", pn.nnconfig);
-//					HTTPSendDetailsAtOnce.sendRequest("vpnn", "save_results", pn.nnconfig);
-				}
+				boolean response = HTTPSendDetailsAtOnce.sendRequest("vpnn", "gossip", pn.nnconfig);
+				pn.converged = response;
 				
+				
+			}
+			else {
+				System.out.println("Node " + pn.getID() + " has converged.");
+				
+			}
+			if (pn.getID() == Network.size()-1) {
+				
+				HTTPSendDetailsAtOnce.sendRequest("vpnn", "calc_losses", pn.nnconfig);
 			}
 			
 			
@@ -214,7 +214,7 @@ public class GadgetProtocol implements CDProtocol {
 	}
 		
 		
-		if (CDState.getCycle() == cycles-1) {
+		if (CDState.getCycle() == cycles-1 && pn.getID() == Network.size()-1 ) {
 			// plot loss curve
 			System.out.println("Cycles " + cycles);
 			HTTPSendDetailsAtOnce.sendRequest("vpnn", "plot", pn.nnconfig);

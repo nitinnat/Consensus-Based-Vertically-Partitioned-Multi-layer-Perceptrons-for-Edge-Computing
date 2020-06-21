@@ -24,6 +24,10 @@
 package peersim.gossip;
 
 import peersim.core.*;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import peersim.config.*;
 /**
  * Class FinalControl
@@ -78,12 +82,31 @@ public FinalControl(String name) {
 
 // Comment inherited from interface
 // Do nothing, just for test
+
+
+public List<Node> getPeers(Node node) {
+	int lid = FastConfig.getLinkable(CommonState.getPid());
+	Linkable linkable = (Linkable) node.getProtocol(lid);
+	if (linkable.degree() > 0) {
+		List<Node> l = new ArrayList<Node>(linkable.degree());			
+		for(int i=0;i<linkable.degree();i++) {
+			l.add(linkable.getNeighbor(i));
+		}
+		return l;
+	}
+	else
+		return null;						
+}			
+
+
 public boolean execute() {
 	System.out.println("Running final control");
 
 	final int len = Network.size();
 	for (int i = 0; i <  len; i++) {
 		PegasosNode node = (PegasosNode) Network.get(i);
+		List<Node> neighbors = getPeers(node);
+		System.out.println("Node " + i + "Neighbors" + neighbors);
 		// close connections
 		System.out.println("Closing http connection for node "+ i);
 	}

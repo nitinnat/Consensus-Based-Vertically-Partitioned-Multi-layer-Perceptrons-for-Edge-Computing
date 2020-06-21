@@ -17,7 +17,7 @@ import com.google.gson.JsonObject;
 
 public class HTTPSendDetailsAtOnce {
 	
-	public static void sendRequest(String base_url, String command, JsonObject nnconfig)
+	public static boolean sendRequest(String base_url, String command, JsonObject nnconfig)
 	{
 	
 		HttpURLConnection connection = null;  
@@ -29,7 +29,7 @@ public class HTTPSendDetailsAtOnce {
         Gson gson = new Gson();
         //convert java object to JSON format
         String json = gson.toJson(nnconfig);
-	    
+	    String response = "false"; // Converged or not 
         try {
 	      //Create connection
 	      URL url = new URL("http://127.0.0.1:5000/"+send_string);
@@ -57,14 +57,18 @@ public class HTTPSendDetailsAtOnce {
 	      
 	      BufferedReader rd = new BufferedReader(new InputStreamReader(is));
 	      String line;
-	      StringBuffer response = new StringBuffer(); 
+	      StringBuffer responsebuf = new StringBuffer(); 
 	      while((line = rd.readLine()) != null) {
-	        response.append(line);
-	        response.append('\r');
+	        responsebuf.append(line);
 	      }
+	      response = responsebuf.toString().trim();
 	      rd.close();
 	      
-	      System.out.println(response);
+	      System.out.println("Response is '" + response+"'");
+	      System.out.println("compareto"+ response.compareTo("true"));
+	      if (response.compareTo("true")==0) {
+	        	return true;
+	        }
 	      
 	    } catch (Exception e) {
 	        e.printStackTrace();
@@ -74,6 +78,9 @@ public class HTTPSendDetailsAtOnce {
 	            connection.disconnect(); 
 	        }
 	    }
+        
+        return false;
+        
 	}
 	
 	
