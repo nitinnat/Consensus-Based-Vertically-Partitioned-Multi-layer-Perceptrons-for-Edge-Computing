@@ -1,1 +1,1 @@
-Consensus DL.
+Code accompanying the paper - https://www.researchgate.net/publication/355172460_Consensus_Based_Vertically_Partitioned_Multi-layer_Perceptrons_for_Edge_Computing
